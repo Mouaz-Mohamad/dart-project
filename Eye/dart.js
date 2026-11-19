@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:1bfc11c205fdffed62b1da3677adcdb79636ca894db5965254b4464819b3b0f7 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:e7cf77f8f61136bfcdce4d1f419fc13cbeacc70ed9fbfc23e435369db9ef6a11 */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -4616,10 +4616,10 @@ function renderBirthdayWidget() {
     label = document.getElementById("birthdayWindowLabel"),
     send = document.getElementById("sendBdayBtn");
   if (label)
-    label.textContent = `Birthday messages for ${batch.key} · unsent only · refreshes at 8:00 PM Cairo`;
+    label.textContent = batch.key;
   if (!batch.all.length)
     feed.innerHTML =
-      '<div class="dart-empty-state">No customer birthdays in the current message list.</div>';
+      '<div class="dart-empty-state">No birthdays today.</div>';
   else if (!rows.length)
     feed.innerHTML =
       '<div class="dart-empty-state dart-birthday-all-sent">All birthday messages in this list have been queued.</div>';
@@ -4647,21 +4647,6 @@ function renderBirthdayWidget() {
 }
 
 /* BEGIN Brand — birthday message queue action */
-async function dartBirthdayDeliveryHealth() {
-  if (!window.DartAdminAccess?.can?.("messaging.read")) return;
-  const feed=document.getElementById("birthday-feed");
-  if (!feed) return;
-  let status=document.getElementById("birthdayDeliveryStatus");
-  if(!status){status=document.createElement("p");status.id="birthdayDeliveryStatus";status.setAttribute("role","status");feed.after(status);}
-  try {
-    const {queue,events}=await window.DartAdminApi.request("/api/v1/admin/messaging/delivery-health");
-    const whatsapp=(events || []).filter(event=>event.channel==="whatsapp");
-    const states=whatsapp.slice(0,5).map(event=>`${event.eventType}: ${event.status}${event.deliveryErrorCode ? ` (${event.deliveryErrorCode})` : ""}`);
-    const marketing=whatsapp.filter(event=>event.category==="marketing").length;
-    const utility=whatsapp.filter(event=>event.category==="utility").length;
-    status.textContent=`Message queue: ${queue.pending} pending · ${queue.uncertain} require review · ${queue.terminal+queue.exhausted} failed · oldest ${queue.oldestSeconds}s. Recent WhatsApp events: ${marketing} Marketing · ${utility} Utility. ${states.join(" · ")}`;
-  } catch(error){status.textContent=error.message || "Delivery status unavailable";}
-}
 function setupBirthdayMessageActions() {
   const send=document.getElementById("sendBdayBtn");
   if(!send || send.dataset.dartBirthdayBound)return;
@@ -4677,12 +4662,10 @@ function setupBirthdayMessageActions() {
       }});
       await Promise.all(["birthday_messages","message_queue"].map(domain=>window.DartDomainState.hydrateDomain(domain,true)));
       renderBirthdayWidget();
-      await dartBirthdayDeliveryHealth();
       window.DartDialog.alert(`${result.queued} birthday messages queued; ${result.alreadyQueued} already queued; ${result.skipped.length} without recorded consent. Queued is not delivery confirmation.`);
     }catch(error){window.DartDialog.alert(error.message || "Unable to queue birthday messages. Please retry.");}
     finally{delete send.dataset.saving;renderBirthdayWidget();}
   });
-  void dartBirthdayDeliveryHealth();
 }
 /* END Brand — birthday message queue action */
 

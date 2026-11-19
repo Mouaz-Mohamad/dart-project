@@ -187,6 +187,8 @@
   let financeBackoffMs = 5_000;
   let financeLastAttemptAt = 0;
   let financeWarnedBackoffMs = 0;
+  const resourceLoads = new Map(), resourceErrors = new Map();
+  let resourceSession = 0;
   const FINANCE_REFRESH_MS = 600_000; // SSE-driven; ten-minute reconciliation.
   const FINANCE_MAX_BACKOFF_MS = 300_000;
 
@@ -451,15 +453,54 @@
     if (!domain || !adapter.writeAndSync || !adapter.hydrateDomain || !adapter.version) {
       throw new Error("The secure finance service is unavailable. Reload and try again.");
     }
-    // Never construct a replacement collection from an unhydrated empty cache.
-    if (!adapter.version(domain)) await adapter.hydrateDomain(domain);
-    if (!adapter.version(domain)) throw new Error("Finance records have not finished loading. Try again.");
-    const rows = FinanceRepository.list(resource).map((row) => ({ ...row }));
-    const index = rows.findIndex((row) => String(row.id) === String(record.id));
-    if (index >= 0) rows[index] = record;
-    else rows.unshift(record);
-    await root.DartDomainState.writeAndSync(STORAGE_KEYS[resource], rows);
-    return record;
+    const find = (rows) => rows.find(row => String(row.id) === String(record.id));
+    const signature = (row) => row ? JSON.stringify(Object.keys(row).filter(key => !["createdAt", "updatedAt"].includes(key)).sort().map(key => [key, row[key]])) : "";
+    const original = signature(find(FinanceRepository.list(resource)));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      // Refresh before constructing the snapshot. An unrelated new expense or
+      // goal must not require a second click or get removed by an older list.
+      await adapter.hydrateDomain(domain, true);
+      if (!adapter.version(domain)) throw new Error("Finance records have not finished loading. Try again.");
+      const rows = FinanceRepository.list(resource).map(row => ({ ...row }));
+      const stored = find(rows);
+      if (stored && signature(stored) === signature(record)) return stored;
+      if (signature(stored) !== original) {
+        throw new Error("This record changed on another device. Reopen it before saving your changes.");
+      }
+      const index = rows.findIndex(row => String(row.id) === String(record.id));
+      if (index >= 0) rows[index] = record;
+      else rows.unshift(record);
+      try {
+        const confirmed = find(await adapter.writeAndSync(STORAGE_KEYS[resource], rows));
+        if (!confirmed) throw new Error("The server did not confirm this record. Keep this form open and retry.");
+        return confirmed;
+      } catch (error) {
+        // Only retry a version race, and only when the edited record itself is
+        // unchanged. Validation, access, incomplete snapshots and network errors
+        // remain visible; the pending ID makes a manual retry idempotent.
+        if (attempt || error.status !== 409 || !["DOMAIN_VERSION_CONFLICT", "VERSION_CONFLICT"].includes(error.code)) throw error;
+      }
+    }
+  }
+
+  function loadFinanceResource(resource, force = false) {
+    const adapter = root.DartDomainState;
+    const domain = adapter?.domainForStorageKey?.(STORAGE_KEYS[resource]);
+    if (!domain || !adapter.hydrateDomain) return null;
+    if (resourceLoads.has(resource)) return resourceLoads.get(resource);
+    if (!force && (adapter.version?.(domain) || resourceErrors.has(resource))) return null;
+    resourceErrors.delete(resource);
+    const session = resourceSession;
+    const pending = Promise.resolve().then(() => adapter.hydrateDomain(domain, true))
+      .catch(() => { if (session === resourceSession) resourceErrors.set(resource, true); })
+      .finally(() => { if (resourceLoads.get(resource) === pending) { resourceLoads.delete(resource); scheduleFinanceRender(); } });
+    resourceLoads.set(resource, pending);
+    return pending;
+  }
+
+  function financeResourceStatus(resource) {
+    if (resourceErrors.has(resource)) return `<p class="dart-finance-empty" role="alert">Saved ${escapeHTML(resource)} could not be loaded. <button type="button" class="dart-finance-secondary" data-finance-resource-retry="${escapeHTML(resource)}">Retry</button></p>`;
+    return resourceLoads.has(resource) ? `<p class="dart-finance-empty" role="status">Loading saved ${escapeHTML(resource)}…</p>` : "";
   }
 
   async function archiveFinanceRecord(resource, id) {
@@ -2105,7 +2146,7 @@
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     return `${sectionToolbar("Expenses", "Accrual view: operating Paid and Unpaid records affect P&L on the expense date. Inventory Acquisition, Loan Repayment and Capital Withdrawal are cash-only here and stay outside operating P&L to avoid double counting. Void records are excluded.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
       <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
-      ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || "-")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), "No expenses exist in the selected period.", false)}`;
+      ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || row.vendor || row.invoiceNumber || row.category || "Expense")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), financeResourceStatus("expenses") ? "Saved expense records are loading or unavailable." : "No expenses exist in the selected period.", false)}`;
   }
 
   function renderBudgets(data, range) {
@@ -2220,6 +2261,7 @@
     const content = document.getElementById("dart-finance-content");
     if (!content) return;
     syncFinancePermissionUi();
+    if (COLLECTIONS.includes(state.financeTab)) loadFinanceResource(state.financeTab);
     const data = dashboardData();
     const range = currentRange();
     const current = authoritativeSummary(range);
@@ -2257,7 +2299,7 @@
       alerts: () => renderAlerts(data, range, current),
       drawlog: () => renderDrawLog(),
     };
-    const markup = (renderers[state.financeTab] || renderers.overview)();
+    const markup = financeResourceStatus(state.financeTab) + (renderers[state.financeTab] || renderers.overview)();
     if (financeContentHost !== content || financeContentMarkup !== markup) {
       content.innerHTML = markup;
       financeContentHost = content;
@@ -2697,6 +2739,8 @@
       void saveFinanceForm(event.target);
     });
     document.addEventListener("click", async (event) => {
+      const resourceRetry = event.target.closest("[data-finance-resource-retry]");
+      if (resourceRetry) { loadFinanceResource(resourceRetry.dataset.financeResourceRetry, true); renderFinanceSection(); return; }
       if (event.target.closest("[data-finance-retry]")) {
         serverFinanceErrors.clear();
         void refreshFinanceFromServer(true);
@@ -2722,6 +2766,7 @@
       const tab = event.target.closest("[data-finance-tab]");
       if (tab) {
         if (!financeTabAllowed(tab.dataset.financeTab)) return;
+        if (COLLECTIONS.includes(tab.dataset.financeTab)) loadFinanceResource(tab.dataset.financeTab, true);
         state.financeTab = tab.dataset.financeTab; renderFinanceSection(); return;
       }
       const openTab = event.target.closest("[data-open-finance-tab]");
@@ -2775,6 +2820,8 @@
     });
     root.addEventListener("dart:admin-logged-out", () => {
       adminAuthenticated = false;
+      resourceSession += 1;
+      resourceLoads.clear(); resourceErrors.clear();
       incomeSession += 1; incomeRevision += 1; incomeRows = []; incomeLoadedKey = ""; incomeErrorKey = ""; incomePendingKey = ""; incomeBusy.clear();
       financeReportSupported = null;
       invalidateAuthoritativeFinance();

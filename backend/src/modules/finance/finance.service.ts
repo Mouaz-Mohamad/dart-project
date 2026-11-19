@@ -283,8 +283,9 @@ export function buildBrandLedger(snapshot: FinanceSnapshot, start: string, end: 
     row.item_code, Number(row.cost_snapshot_minor), { item: row.item_code }));
   for (const row of (snapshot.states.get("finance_expenses") || []).filter(active)) {
     if (String(row.status || "").toLowerCase() === "void" || isInventoryAcquisitionExpense(row) || isFinancingExpense(row) || !inRange(row.date, start, end)) continue;
-    add(outgoing, `expense:${String(row.id)}`, row.date, "Operating expense", row.id, toMinor(row.amount),
-      { category: row.category, description: row.description, vendor: row.vendor, status: row.status });
+    const name = [row.description, row.vendor, row.invoiceNumber].map(value => String(value || "").trim()).find(Boolean) || String(row.category || "Expense");
+    add(outgoing, `expense:${String(row.id)}`, row.date, "Operating expense", name, toMinor(row.amount),
+      { category: row.category, description: row.description, vendor: row.vendor, invoiceNumber: row.invoiceNumber, status: row.status });
   }
   for (const row of (snapshot.states.get("finance_settlements") || []).filter(active)) {
     if (!inRange(row.settlementDate, start, end) || !toMinor(row.fee)) continue;

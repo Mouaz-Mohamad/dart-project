@@ -31,7 +31,7 @@ describe("Brand detail SQL", () => {
           ('damaged',15004,'M1','Black','M','Damaged',true,'2026-10-01T12:00Z');
         INSERT INTO waitlist_entries VALUES ('M1','Black','M','waiting'),('M1','Black','M','cancelled');
         INSERT INTO set_waiting_entries VALUES ('[{"modelId":"M1","color":"Black","size":"M"},{"modelId":"M1","color":"Black","size":"M"}]','waiting');
-        INSERT INTO finance_records VALUES ('finance_expenses','e1',1,'{"id":"e1","date":"2026-10-04","amount":10.01,"status":"Paid"}');
+        INSERT INTO finance_records VALUES ('finance_expenses','e1',1,'{"id":"e1","date":"2026-10-04","amount":10.01,"status":"Paid","description":"فاتورة التصوير"}');
         INSERT INTO damage_records VALUES ('d1',1,'{"id":"d1","itemCode":"damaged","status":"Damaged","date":"2026-10-12","costSnapshot":150.04}');
         INSERT INTO return_requests VALUES ('r1',1,'{"id":"r1","orderId":"O1","itemCode":"sold","status":"Completed","completedAt":"2026-10-15","isPostDeliveryReturn":true,"requestType":"Refund","refundAmount":100.01}');
       `);
@@ -46,6 +46,7 @@ describe("Brand detail SQL", () => {
         const ledger = report as { rows: Array<{ lane: string; amountMinor: number }>; totals: { amountMinor: number } };
         expect(ledger.rows.reduce((sum, row) => sum + (metric === "profit" && row.lane === "outgoing" ? -row.amountMinor : row.amountMinor), 0)).toBe(ledger.totals.amountMinor);
         if (metric !== "profit") expect(ledger.totals).not.toHaveProperty("incomeMinor");
+        if (metric === "cost") expect(ledger.rows.find(row => (row as {id?:string}).id === "expense:e1")).toMatchObject({reference:"فاتورة التصوير"});
       }
       const overview = await service.brandDetails("overview", "2026-10-01", "2026-10-30", 1, 100, visibility);
       expect(overview).toMatchObject({ totals: { pieces: 2, models: 1, costMinor: 27005, sellingMinor: 85002 }, top: { models: { waiting: 3, total: 4, sold: 0 } } });

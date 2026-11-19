@@ -17,7 +17,7 @@ beforeEach(async () => {
   await db.exec(`CREATE TABLE traffic_analytics_events (
     event_key text UNIQUE, event_type text, visitor_id uuid, session_id uuid, customer_user_id uuid,
     order_code text, reservation_id text, path text, model_id text, color text, size text, quantity int,
-    occurred_at timestamptz DEFAULT '2026-10-22T12:00:00Z'
+    occurred_at timestamptz DEFAULT '2026-11-22T12:00:00Z'
   );
   CREATE TABLE orders (id uuid, customer_user_id uuid, created_at timestamptz, is_deleted bool DEFAULT false, order_source text);
   CREATE TABLE order_items (id uuid, order_id uuid);
@@ -34,21 +34,23 @@ afterEach(async () => { await db?.close(); });
 
 describe("traffic PostgreSQL identity and reporting", () => {
   it("backfills old visitors and retains visit-N codes while repeated/new sessions change only visits", async () => {
-    await service.recordEvent({ eventType: "visit", visitorId: ids[0]!, sessionId: ids[0]! }, null);
+    await service.recordEvent({ eventType: "visit", visitorId: ids[0]!, sessionId: ids[1]! }, null);
     await service.recordEvent({ eventType: "visit", visitorId: ids[0]!, sessionId: accountId }, null);
     await service.recordEvent({ eventType: "visit", visitorId: ids[2]!, sessionId: ids[2]! }, null);
+    await service.recordEvent({ eventType: "visit", visitorId: ids[1]!, sessionId: accountId }, null);
     const report = await service.report("2026-01-01", "2026-12-31", "hourly");
     expect(report.summary).toMatchObject({ uniqueVisitors: 3, visits: 4 });
     expect(report.visitors.find(row => row.visitorId === ids[0])).toMatchObject({ name: "visit-1", visitorCode: "visit-1", visits: 2 });
     expect(report.visitors.find(row => row.visitorId === ids[1])?.name).toBe("visit-2");
     expect(report.visitors.find(row => row.visitorId === ids[2])?.name).toBe("visit-3");
     expect(report.series).toHaveLength(24);
-    const shorter = await service.report("2026-10-01", "2026-10-31", "daily");
+    expect(report.start).toBe("2026-11-08");
+    const shorter = await service.report("2026-11-01", "2026-11-30", "daily");
     expect(shorter.visitors.find(row => row.visitorId === ids[0])?.name).toBe("visit-1");
   });
 
   it("merges three authenticated browsers under one account without duplicating visit events", async () => {
-    for (const id of ids) await service.recordEvent({ eventType: "visit", visitorId: id, sessionId: id }, accountId);
+    for (const id of ids) await service.recordEvent({ eventType: "visit", visitorId: id, sessionId: accountId }, accountId);
     const report = await service.report("2026-01-01", "2026-12-31", "hourly");
     expect(report.summary).toMatchObject({ uniqueVisitors: 1, visits: 3 });
     expect(report.visitors).toHaveLength(1);
@@ -58,16 +60,30 @@ describe("traffic PostgreSQL identity and reporting", () => {
 
   it("accepts long hourly periods, respects Cairo year boundaries and keeps the ten-year bound", async () => {
     await db.exec(`INSERT INTO traffic_analytics_events (event_key,event_type,visitor_id,occurred_at) VALUES
-      ('year-before','visit','${ids[2]}','2025-12-31T21:59:59Z'),
-      ('year-start','visit','${ids[2]}','2025-12-31T22:00:00Z'),
-      ('year-end','visit','${ids[2]}','2026-12-31T21:59:59Z'),
-      ('year-after','visit','${ids[2]}','2026-12-31T22:00:00Z');`);
-    const report = await service.report("2026-01-01", "2026-12-31", "hourly");
-    expect(report.summary.visits).toBe(4);
+      ('year-before','visit','${ids[2]}','2026-12-31T21:59:59Z'),
+      ('year-start','visit','${ids[2]}','2026-12-31T22:00:00Z'),
+      ('year-end','visit','${ids[2]}','2027-12-31T21:59:59Z'),
+      ('year-after','visit','${ids[2]}','2027-12-31T22:00:00Z');`);
+    const report = await service.report("2027-01-01", "2027-12-31", "hourly");
+    expect(report.summary.visits).toBe(2);
     expect(report.series[0]?.visits).toBe(1);
     expect(report.series[23]?.visits).toBe(1);
     await expect(service.report("2027-01-01", "2026-01-01", "hourly")).rejects.toMatchObject({ code: "INVALID_ANALYTICS_RANGE" });
     await expect(service.report("2010-01-01", "2026-12-31", "hourly")).rejects.toMatchObject({ code: "ANALYTICS_RANGE_TOO_LARGE" });
+  });
+
+  it("counts only launch-day visits from midnight Cairo and preserves earlier records", async () => {
+    await db.exec(`INSERT INTO traffic_analytics_events(event_key,event_type,visitor_id,occurred_at) VALUES
+      ('launch-before','visit','${ids[2]}','2026-11-07T21:59:59Z'),
+      ('launch-start','visit','${ids[2]}','2026-11-07T22:00:00Z');`);
+    const report = await service.report("2026-11-01", "2026-11-08", "daily");
+    expect(report).toMatchObject({ start:"2026-11-08", launchDate:"2026-11-08", summary:{visits:1,uniqueVisitors:1} });
+    expect(report.series).toHaveLength(1);
+    const earlier = await service.report("2026-01-01", "2026-11-07", "hourly");
+    expect(earlier.summary.visits).toBe(0);
+    expect(earlier.visitors).toEqual([]);
+    expect(earlier.series).toEqual([]);
+    expect((await db.query("SELECT count(*)::int AS total FROM traffic_analytics_events")).rows[0]).toEqual({total:4});
   });
 
   it("protects visitor mappings with RLS and exposes no table/sequence privileges to PUBLIC", async () => {

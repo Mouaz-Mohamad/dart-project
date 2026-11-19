@@ -1,6 +1,8 @@
 # Website traffic identity and shared periods
 
-Updated 2026-10-22.
+Updated 2026-11-19.
+
+Brand reports count activity from launch, 8 November 2026 at midnight Cairo time. The general date filter narrows that interval: a monthly/yearly range crossing launch starts on 8 November, while a range entirely before launch displays zero activity. Older events and visitor codes are retained. The API includes `launchDate: "2026-11-08"` and returns the effective `start` for overlapping ranges.
 
 Guests keep their existing first-party browser UUID in `dart_vid` (one year, refreshed on visits). A sessionStorage fallback keeps it across navigation if cookies cannot be read or saved. Only an identifier is stored: all events, counters, profiles and reports remain in PostgreSQL. Clearing site data, private browsing or changing browser/profile can create another anonymous visitor; this is browser-level estimation, not guaranteed physical-device identification. No IP matching or fingerprinting is introduced.
 

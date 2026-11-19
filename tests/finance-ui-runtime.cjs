@@ -188,6 +188,34 @@ async function main() {
     assert.match(markup, /<td data-column-label="[^"]+"/, key + " keeps field names on body cells");
     assert.match(markup, /data-finance-(?:edit|delete)=/, key + " record actions remain available");
   }
+  // A failed initial domain load must not masquerade as an empty expense log.
+  const readyAdapter = window.DartDomainState;
+  let loadedExpenses = false, expenseLoads = 0;
+  window.DartState.write("dart_finance_expenses", []);
+  window.DartDomainState = {
+    ...readyAdapter,
+    version: domain => domain === "finance_expenses" && !loadedExpenses ? 0 : 1,
+    async hydrateDomain(domain) {
+      if (domain !== "finance_expenses") return;
+      expenseLoads++;
+      if (expenseLoads === 1) throw new Error("offline");
+      loadedExpenses = true;
+      window.DartState.write("dart_finance_expenses", [{id:"saved-expense",date:today,amount:125,category:"Other",description:"Saved invoice",status:"Unpaid"}]);
+    },
+  };
+  ui.state.financeTab = "expenses";
+  ui.renderFinanceSection();
+  assert.match(nodes.get("dart-finance-content").innerHTML,/Loading saved expenses/);
+  assert.doesNotMatch(nodes.get("dart-finance-content").innerHTML,/No expenses exist/);
+  await tick(); ui.renderFinanceSection();
+  assert.match(nodes.get("dart-finance-content").innerHTML,/data-finance-resource-retry="expenses"/);
+  ui.renderFinanceSection(); await tick();
+  assert.equal(expenseLoads,1,"failed domain loads must wait for Retry");
+  await callbacks.get("click")({target:{closest:selector=>selector === "[data-finance-resource-retry]" ? {dataset:{financeResourceRetry:"expenses"}} : null}});
+  await tick(); ui.renderFinanceSection();
+  assert.match(nodes.get("dart-finance-content").innerHTML,/Saved invoice/);
+  assert.doesNotMatch(nodes.get("dart-finance-content").innerHTML,/data-finance-resource-retry/);
+  window.DartDomainState = readyAdapter;
   // A failing report must display Retry and stop immediate error/re-render loops.
   ui.state.financeTab = "pnl";
   await window.DartFinance.hydrateAuthoritativeFinance(undefined, true);

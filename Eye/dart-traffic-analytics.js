@@ -163,7 +163,9 @@ function renderTrafficReportTow(report) {
 
   const period = document.getElementById("trafficPeriodLabelTow");
   if (period) {
-    period.textContent = report.group === "hourly"
+    period.textContent = report.launchDate && report.end < report.launchDate
+      ? "No visitors before 8 Nov 2026 · Brand launch"
+      : report.group === "hourly"
       ? `${report.start} → ${report.end} · hourly audience pattern · Cairo time`
       : `${report.start} → ${report.end} · grouped ${report.group}`;
   }

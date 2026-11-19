@@ -295,6 +295,15 @@ Shared limits require migration 0060 and `RATE_LIMIT_STORE=postgres`, now the pr
 - Authenticated traffic is grouped by the server-authenticated account, including that browser's previously anonymous events. Repeating the same visitor/session event is idempotent. Distinct sessions increase visits without increasing unique visitors for that browser/account.
 - `GET /api/v1/admin/analytics/traffic` retains Staff/MFA/`analytics.read` checks. Every aggregation uses the same selected `start`/`end` range, bounded to 3660 inclusive days; `hourly` returns 24 Cairo hour-of-day buckets over the selected period, not one bucket per timestamp.
 - Brand and Finance share `Last Year` (the previous full calendar year, compared with the calendar year before it). Existing This Year and Custom behavior is retained. Visitor codes are stable across date-filter changes; they are labels, not row numbers or total-visitor counts.
+- Brand traffic reporting begins at `2026-11-08` midnight in `Africa/Cairo`. An overlapping range returns the effective start and `launchDate`; a wholly earlier range returns zero totals and empty series/details. Events and stable visitor numbers before launch remain stored. The original requested interval is still validated against the ten-year bound.
+
+## Finance synchronization — 2026-11-19
+
+- Finance domain reads obtain version and ordered relational records in one PostgreSQL statement. A version from one snapshot cannot be paired with records from a later snapshot.
+- A finance edit refreshes its collection, preserves unrelated records, and retries one `DOMAIN_VERSION_CONFLICT` only when the edited record itself is unchanged. A changed target record requires reopening; access, validation and incomplete-snapshot errors are not retried. A successful result must contain the saved ID. A previously confirmed identical record is reused without another mutation.
+- Finance record tabs load independently of summary reports and distinguish loading, failed load with Retry, and a confirmed empty list.
+- The outgoing ledger displays an expense description, vendor or invoice number as its reference, retaining the stable expense ID for record identity. This changes presentation only, not accounting totals.
+- Staff push may renew a known expired/key-changed/session-ended subscription after sign-in with existing browser permission. Explicit opt-out is retained as a UI preference and prevents automatic renewal. Permission is requested only by Enable; renewal remains session/version checked by the API. No historical events or test broadcasts are sent by deployment.
 
 ## Related models and quantity campaigns
 

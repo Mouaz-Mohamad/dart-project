@@ -7,6 +7,7 @@
   if (!bar || !panel) return;
   let rows = [], nextCursor = null, inFlight = null, queued = false, epoch = 0, hydrated = false, pendingDeepLink = true;
   let unread = 0, soundReady = false, audio = null, fallbackTimer = 0, subscriptionId = null;
+  let pushSync = null, pushConnecting = false, lastPushCheck = 0;
   const sessionSeen = new Set();
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const enabled = () => window.DartAdminAccess?.can("notifications.read") === true;
@@ -134,35 +135,53 @@
     return (result.subscriptions || []).find(record => record.endpointHash === endpointHash) || null;
   }
   async function syncPush() {
-    if (!enabled() || !window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+    if (!enabled() || document.hidden || navigator.onLine === false || !window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
+    if (pushSync || pushConnecting || Date.now() - lastPushCheck < 600000) return;
+    lastPushCheck = Date.now();
+    const generation = epoch;
+    pushSync = (async () => {
     try {
+      if (localStorage.getItem("dart_admin_push_autorenew") === "off") { pushStatus("Phone notifications disabled on this device."); return; }
       const config = await api("/api/v1/admin/push/config");
       if (!config.configured) { pushStatus("Phone notifications are not configured yet."); return; }
       const registration = await registerWorker(); await activeWorker(registration);
       const subscription = await registration.pushManager.getSubscription();
       const record = subscription ? await pushRecord(subscription) : null;
+      if (generation !== epoch || !enabled()) return;
       if (record?.enabled) {
         subscriptionId = record.id;
+        localStorage.setItem("dart_admin_push_autorenew", "on");
         pushStatus("Phone notifications enabled on this device.");
         document.getElementById("dart-push-disable").hidden = false;
       } else {
-        // Do not silently resurrect an opted-out, ended-session or provider-expired device.
         subscriptionId = null;
         document.getElementById("dart-push-disable").hidden = true;
-        pushStatus(record?.disabledReason === "provider_expired"
-          ? "Phone subscription expired. Tap Enable phone notifications to create a fresh subscription."
-          : "Tap Enable phone notifications to connect or renew this device.");
+        // Retain granted consent across provider expiry/session renewal. An
+        // explicit opt-out always wins, including after browser unsubscribing.
+        if (record?.disabledReason === "customer_opt_out") {
+          localStorage.setItem("dart_admin_push_autorenew", "off");
+          pushStatus("Phone notifications disabled on this device.");
+        } else if ((record && ["provider_expired", "expired", "key_changed", "session_ended"].includes(record.disabledReason)) ||
+                   localStorage.getItem("dart_admin_push_autorenew") === "on" || (record && !record.enabled && !record.disabledReason)) {
+          await enablePush(true, config);
+        } else pushStatus("Tap Enable phone notifications to connect this device.");
       }
     } catch { pushStatus("Tap Enable phone notifications to renew this device."); }
+    })().finally(() => { if (generation === epoch) pushSync = null; });
+    return pushSync;
   }
-  async function enablePush() {
+  async function enablePush(automatic = false, knownConfig = null) {
+    if (pushConnecting || !enabled()) return;
+    pushConnecting = true;
+    const generation = epoch;
     const button = document.getElementById("dart-push-enable"); button.disabled = true;
     try {
       if (!window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) throw new Error("This browser does not support push. On iPhone, add Dart Eye to the Home Screen and open it there.");
       // Permission is requested from the explicit click before asynchronous setup.
-      if (await Notification.requestPermission() !== "granted") throw new Error("Allow notifications in your browser settings, then retry.");
-      const config = await api("/api/v1/admin/push/config"); if (!config.configured) throw new Error("Phone notifications are not configured yet.");
+      const permission = automatic ? Notification.permission : await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Allow notifications in your browser settings, then retry.");
+      const config = knownConfig || await api("/api/v1/admin/push/config"); if (!config.configured) throw new Error("Phone notifications are not configured yet.");
       const registration = await registerWorker(); await activeWorker(registration);
       let subscription = await registration.pushManager.getSubscription();
       if (subscription) {
@@ -170,17 +189,22 @@
         const key = subscription.options.applicationServerKey;
         const keyMismatch = key && btoa(String.fromCharCode(...new Uint8Array(key)))
           .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") !== config.publicKey;
-        // A 404/410 from the provider makes the endpoint unusable. Re-subscribe on explicit consent.
-        if (!record || ["provider_expired", "expired", "key_changed"].includes(record.disabledReason) || keyMismatch) {
+        // A 404/410 endpoint cannot be used again; obtain fresh browser keys.
+        if (!record || ["provider_expired", "expired", "key_changed"].includes(record.disabledReason) || keyMismatch ||
+            (subscription.expirationTime && subscription.expirationTime <= Date.now())) {
           await subscription.unsubscribe();
           subscription = null;
         }
       }
+      if (generation !== epoch || !enabled() || (automatic && localStorage.getItem("dart_admin_push_autorenew") === "off")) return;
       if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(config.publicKey) });
+      if (generation !== epoch || !enabled() || (automatic && localStorage.getItem("dart_admin_push_autorenew") === "off")) return;
       const result = await api("/api/v1/admin/push/subscriptions", { method: "POST", body: { subscription: subscription.toJSON(), publicKey: config.publicKey } });
+      if (generation !== epoch) return;
+      localStorage.setItem("dart_admin_push_autorenew", "on");
       subscriptionId = result.id; pushStatus("Phone notifications enabled on this device."); document.getElementById("dart-push-disable").hidden = false;
     } catch (error) { pushStatus(error.status ? "This device could not be enabled. Retry or sign in again." : error.message); }
-    finally { button.disabled = false; }
+    finally { pushConnecting = false; button.disabled = false; }
   }
   function start() {
     if (!enabled()) return;
@@ -188,7 +212,7 @@
   }
   function scheduleFallback() {
     clearTimeout(fallbackTimer);
-    fallbackTimer = setTimeout(() => { if (!window.DartChanges?.active) void refresh(); scheduleFallback(); }, 60000);
+    fallbackTimer = setTimeout(() => { if (!window.DartChanges?.active) void refresh(); void syncPush(); scheduleFallback(); }, 60000);
   }
   document.getElementById("dart-notification-bell").addEventListener("click", () => showPanel(panel.hidden));
   document.getElementById("dart-notification-close").addEventListener("click", () => showPanel(false));
@@ -198,6 +222,7 @@
   document.getElementById("dart-push-enable").addEventListener("click", () => void enablePush());
   document.getElementById("dart-push-disable").addEventListener("click", async () => {
     try {
+      localStorage.setItem("dart_admin_push_autorenew", "off");
       if (subscriptionId) await api("/api/v1/admin/push/subscriptions/" + encodeURIComponent(subscriptionId), { method: "DELETE" });
       const registration = await navigator.serviceWorker.getRegistration("/Eye/push/");
       const subscription = await registration?.pushManager.getSubscription(); if (subscription) await subscription.unsubscribe();
@@ -219,12 +244,13 @@
   document.addEventListener("keydown", event => { if (event.key === "Escape" && !panel.hidden) { showPanel(false); document.getElementById("dart-notification-bell").focus(); } });
   window.addEventListener("dart:admin-authenticated", start);
   window.addEventListener("dart:server-change", event => { if (event.detail?.reconcile || event.detail?.name === "admin_notifications") void refresh(); });
-  window.addEventListener("online", () => void refresh());
-  window.addEventListener("focus", () => void refresh());
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) void refresh(); });
+  window.addEventListener("online", () => { void refresh(); void syncPush(); });
+  window.addEventListener("focus", () => { void refresh(); void syncPush(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { void refresh(); void syncPush(); } });
   window.addEventListener("dart:data-changed", event => {
     if (event.detail?.source !== "logout") return;
     epoch++; inFlight = null; queued = false; rows = []; sessionSeen.clear(); hydrated = false; unread = 0; subscriptionId = null;
+    pushSync = null; lastPushCheck = 0;
     clearTimeout(fallbackTimer); bar.hidden = true; showPanel(false); render({});
   });
   // Settings action broadcasts only to eligible subscribed staff devices.

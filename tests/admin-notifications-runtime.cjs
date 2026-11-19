@@ -59,9 +59,9 @@ async function worker() {
   assert.equal(new URL(targets[0]).origin, "https://synthetic.test"); assert.match(targets[0], /notification=00000000/);
 }
 
-async function pushRenewal() {
+async function pushRenewal(reason = "provider_expired") {
   // Browser already granted permission, but its server subscription was disabled by a push-provider 410.
-  // Page load must not reactivate it, and the explicit button must create a brand-new endpoint.
+  // Existing permission may renew an expired endpoint; an explicit opt-out wins.
   const { createHash } = require("node:crypto");
   const ids = new Map([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], element()]));
   const calls = [];
@@ -79,8 +79,10 @@ async function pushRenewal() {
     subscribe: async () => { subscribeCalls++; current = fresh; return fresh; },
   } };
   const record = { id: "old-subscription", endpointHash: createHash("sha256").update(endpoint).digest("hex"),
-    enabled: false, disabledReason: "provider_expired" };
-  const Notification = { permission: "granted", requestPermission: async () => "granted" };
+    enabled: false, disabledReason: reason };
+  const preferences = new Map();
+  let permissionRequests = 0;
+  const Notification = { permission: "granted", requestPermission: async () => { permissionRequests++; return "granted"; } };
   const window = { isSecureContext: true, Notification, PushManager: function () {},
     crypto: { subtle: { digest: async (_algorithm, bytes) =>
       Uint8Array.from(createHash("sha256").update(Buffer.from(bytes)).digest()).buffer } },
@@ -98,19 +100,22 @@ async function pushRenewal() {
   const navigator = {onLine:true,serviceWorker:{register:async()=>worker,getRegistration:async()=>worker}};
   vm.runInNewContext(source,{window,document,navigator,Notification,location:{href:"https://synthetic.test/Eye/Dart%20Eye.html"},
     history:{replaceState(){}},URL,Uint8Array,TextEncoder,atob,btoa,Date,Set,Map,setTimeout:()=>1,clearTimeout(){},
-    localStorage:{getItem:()=>null,setItem(){} }});
+    localStorage:{getItem:key=>preferences.get(key)||null,setItem(key,value){preferences.set(key,value);}} });
+  await new Promise(resolve => setImmediate(resolve));
   await flush();
-  assert.match(ids.get("dart-push-status").textContent,/expired/i);
-  assert.equal(ids.get("dart-push-disable").hidden,true);
-  assert.equal(calls.filter(x=>x.opts?.method==="POST").length,0,"startup must never silently reactivate expired or opted-out devices");
-  ids.get("dart-push-enable").events.click();
+  assert.equal(permissionRequests,0,"automatic renewal must never request permission");
+  if (reason === "customer_opt_out") {
+    assert.equal(calls.filter(x=>x.opts?.method==="POST").length,0,"startup must never reactivate an opted-out device");
+    assert.equal(preferences.get("dart_admin_push_autorenew"),"off");
+    ids.get("dart-push-enable").events.click();
+  }
   // Cross-realm async requests finish on the next turn, beyond a fixed microtask loop.
   await new Promise(resolve => setImmediate(resolve));
   await flush();
-  assert.equal(oldUnsubscribed,true,"explicit renewal must unsubscribe the dead push endpoint");
-  assert.equal(subscribeCalls,1,"fresh browser subscription required");
+  assert.equal(oldUnsubscribed,reason === "provider_expired","expired endpoints need a fresh subscription");
+  assert.equal(subscribeCalls,reason === "provider_expired" ? 1 : 0,"reuse a valid endpoint only for an explicit opt-in");
   const post=calls.find(x=>x.opts?.method==="POST");
-  assert.equal(post?.opts?.body?.subscription?.endpoint,freshEndpoint);
+  assert.equal(post?.opts?.body?.subscription?.endpoint,reason === "provider_expired" ? freshEndpoint : endpoint);
   assert.equal(ids.get("dart-push-disable").hidden,false);
 }
-(async () => { await ui(); await worker(); await pushRenewal(); console.log("PASS staff notifications: counters, safe native click, and expired push renewal with explicit consent"); })().catch(error => { console.error(error); process.exitCode = 1; });
+(async () => { await ui(); await worker(); await pushRenewal(); await pushRenewal("customer_opt_out"); console.log("PASS staff notifications: counters, safe native click, granted push renewal, and explicit opt-out"); })().catch(error => { console.error(error); process.exitCode = 1; });

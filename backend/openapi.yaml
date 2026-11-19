@@ -1005,6 +1005,7 @@ paths:
     get:
       tags: [Analytics]
       summary: Read authoritative website traffic and conversion funnel analytics for a selected Brand period.
+      description: Activity begins at Brand launch, 2026-11-08 midnight Africa/Cairo. Overlapping ranges return the effective start and launchDate. Wholly earlier ranges return zero totals and empty series/details; historical events and visitor codes remain stored.
       operationId: getTrafficAnalytics
       security: [{ sessionCookie: [] }]
       parameters:

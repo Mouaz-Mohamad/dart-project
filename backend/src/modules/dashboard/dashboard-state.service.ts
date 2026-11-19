@@ -104,6 +104,20 @@ export class DashboardStateService {
   }
 
   async read(domain: DashboardDomain): Promise<{ domain: DashboardDomain; version: number; data: unknown[] }> {
+    if (domain.startsWith("finance_")) {
+      // Version and rows must belong to the same PostgreSQL snapshot. Separate
+      // queries could pair a new list with an old version during a live update.
+      const result = await this.pool.query<{ version: string; data: unknown[] }>(
+        `SELECT state.version::text, COALESCE((
+           SELECT jsonb_agg(record.payload ORDER BY record.position, record.record_id)
+           FROM finance_records record WHERE record.domain=state.domain
+         ), '[]'::jsonb) AS data FROM dashboard_domain_state state WHERE state.domain=$1`,
+        [domain],
+      );
+      const row = result.rows[0];
+      if (!row) throw new AppError(404, "DOMAIN_NOT_FOUND", "Dashboard domain not found");
+      return { domain, version: Number(row.version || 1), data: row.data };
+    }
     if (domain === "reviews" || domain === "contacts") {
       const result = await this.pool.query<FeedbackRow>(
         "SELECT domain, version::text, data FROM dashboard_domain_state WHERE domain = ANY($1::text[])",

@@ -307,6 +307,15 @@ export class TrafficAnalyticsService {
     if (!Number.isFinite(spanDays) || spanDays < 1 || spanDays > 3660) {
       throw new AppError(422, "ANALYTICS_RANGE_TOO_LARGE", "Analytics range must be 10 years or less");
     }
+    const launchDate = "2026-11-08";
+    if (end < launchDate) return {
+      start, end, group, launchDate,
+      summary: { uniqueVisitors: 0, visits: 0, addToCartVisitors: 0, addToCartEvents: 0,
+        itemsAdded: 0, completedOrders: 0, ordersPlaced: 0, orderedPieces: 0, addToCartRate: 0, conversionRate: 0 },
+      series: [], visitors: [], detailsLimit: 250,
+    };
+    // Retain historical events and visitor codes; reports begin at launch in Cairo.
+    if (start < launchDate) start = launchDate;
 
     const client = await this.pool.connect();
     try {
@@ -493,6 +502,7 @@ export class TrafficAnalyticsService {
         start,
         end,
         group,
+        launchDate,
         summary: {
           uniqueVisitors,
           visits: count(totals.visits),

@@ -65,6 +65,30 @@ async function main() {
     state.write(key, [{ id: "settlement" }]);
     assert.equal(finance.repository.list(resource).length, 1);
   }
+
+  // One click must merge an unrelated change made on another device, rather
+  // than forcing the owner to submit the same new goal a second time.
+  const stale = runtime();
+  stale.server.set("finance_goals", { version: 1, data: [{ id: "old", target: 100 }] });
+  await stale.window.DartDomainState.hydrateDomain("finance_goals");
+  stale.server.set("finance_goals", { version: 2, data: [{ id: "old", target: 200 }] });
+  await stale.window.DartFinance.persistRecord("goals", { id: "first-click", target: 300 });
+  assert.deepEqual(stale.server.get("finance_goals").data.map(row => [row.id, row.target]), [["first-click", 300], ["old", 200]]);
+  let conflicted = false;
+  stale.intercept(async call => {
+    if (call.method === "PUT" && !conflicted) {
+      conflicted = true;
+      const row = stale.server.get("finance_goals");
+      stale.server.set("finance_goals", { version: row.version + 1, data: [...row.data, { id: "parallel", target: 400 }] });
+      return { ok: false, status: 409, json: async () => ({ error: { code: "DOMAIN_VERSION_CONFLICT", message: "Changed concurrently" } }) };
+    }
+  });
+  await stale.window.DartFinance.persistRecord("goals", { id: "race-safe", target: 500 });
+  assert.equal(stale.server.get("finance_goals").data.length, 4, "retry keeps the unrelated concurrent goal");
+  stale.intercept(null);
+  stale.server.set("finance_goals", { version: 5, data: [{ id: "race-safe", target: 999 }] });
+  await assert.rejects(stale.window.DartFinance.persistRecord("goals", { id: "race-safe", target: 600 }), /changed/i);
+  assert.equal(stale.server.get("finance_goals").data[0].target, 999, "never overwrite another edit of the same goal");
   state.write("dart_draw_eligibility_audit", [{ id: "draw" }]);
   assert.equal(state.isBusinessKey("dart_draw_eligibility_audit"), true);
   state.write("ui_preference", "keep");
