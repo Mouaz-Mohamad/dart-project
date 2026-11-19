@@ -204,7 +204,7 @@ describe("second Council regressions on the production schema", () => {
   });
 
   it("books dated gross COD receipts and refunds once regardless of event order, preserving closed periods", async () => {
-    const finance = new FinanceService(store.pool);
+    const finance = new FinanceService(store.pool, "2000-01-01");
     for (const refundFirst of [true, false]) {
       const f = await fixture({ ordinary: true });
       // A partial discretionary refund is an ordinary-item scenario; Set returns
@@ -240,7 +240,7 @@ describe("second Council regressions on the production schema", () => {
 
   it("preserves posted revenue, COGS and cash when a delivered order is archived", async () => {
     const f = await fixture(); const order = await checkout(f); await deliver(order);
-    const finance = new FinanceService(store.pool);
+    const finance = new FinanceService(store.pool, "2000-01-01");
     const before = await finance.summary("2026-01-01", "2099-12-31");
     await commerce.adminOrderStateAction(actor, String(order.orderId), "archive", "synthetic");
     const after = await finance.summary("2026-01-01", "2099-12-31");
@@ -249,7 +249,7 @@ describe("second Council regressions on the production schema", () => {
 
   it("preserves posted refund cash and COGS reversal when a completed return is archived", async () => {
     const f = await fixture(); const order = await checkout(f); await deliver(order); await refund(f.pieces[0]!, 750);
-    const finance = new FinanceService(store.pool), state = new DashboardStateService(store.pool);
+    const finance = new FinanceService(store.pool, "2000-01-01"), state = new DashboardStateService(store.pool);
     const before = await finance.summary("2026-01-01", "2099-12-31");
     const domain = await state.read("returns");
     await state.write("returns", domain.version, (domain.data as Record<string, unknown>[]).map((row) => String(row.orderId) === String(order.orderId) ? { ...row, isArchived: true } : row), actor, "synthetic");
