@@ -39,7 +39,7 @@ describe("Brand detail SQL", () => {
       const pool = { connect: async () => ({ query: async (sql: string, values: unknown[] = []) => {
         queries.push(sql); return db.query(sql, values);
       }, release() {} }) } as unknown as Pool;
-      const service = new FinanceService(pool);
+      const service = new FinanceService(pool, "2026-09-01");
       const visibility = { costs: true, waiting: true, sales: true };
       for (const metric of ["sales", "cost", "damage", "profit"] as const) {
         const report = await service.brandDetails(metric, "2026-10-01", "2026-10-30", 1, 100, visibility);
