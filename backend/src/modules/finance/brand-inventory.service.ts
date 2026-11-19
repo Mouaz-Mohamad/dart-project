@@ -100,6 +100,9 @@ export function calculateBrandInventory(input: BrandInventoryInput, start: strin
     if (String(row.requestType || "").toLowerCase().includes("exchange")) continue;
     const original = row.originalLineSnapshot as Row | undefined;
     const line = lineByOrderItem.get(`${text(row.orderId)}:${text(row.itemCode)}`);
+    // A prelaunch test return must not subtract a sale from official model metrics.
+    // Real returns have a matching order+piece line, even if the sale was in an earlier official month.
+    if (!line) continue;
     const item = items.get(text(row.itemCode));
     const variant = line || { model_id: original?.modelCode || original?.modelId || item?.model_id,
       color: original?.color || item?.color, size: original?.size || item?.size };
