@@ -1,6 +1,6 @@
 // Dart's first official operating day. Earlier records are retained as test history.
 // A date (not a UTC timestamp) makes the boundary midnight in Africa/Cairo.
-export const OFFICIAL_ACCOUNTING_START = "2026-11-18";
+export const OFFICIAL_ACCOUNTING_START = "2026-11-08";
 export const OFFICIAL_ACCOUNTING_ZONE = "Africa/Cairo";
 
 // Financial reports only include transactions created on/after the launch day.
