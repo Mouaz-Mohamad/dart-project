@@ -13,7 +13,7 @@ describe("income and third party order collection", () => {
   let today: string;
   beforeAll(async () => {
     store = await embeddedStore(true);
-    incomes = new IncomeService(store.pool); finance = new FinanceService(store.pool); commerce = new CommerceService(store.pool);
+    incomes = new IncomeService(store.pool); finance = new FinanceService(store.pool, "2000-01-01"); commerce = new CommerceService(store.pool);
     await store.pool.query(`INSERT INTO users(id,account_type,email,email_normalized,password_hash,status,email_verified_at)
       VALUES($1,'staff',$2,$2,'synthetic','active',now())`, [actor, `${actor}@example.test`]);
     await store.pool.query("INSERT INTO staff_users(user_id,display_name) VALUES($1,'Income fixture')", [actor]);
