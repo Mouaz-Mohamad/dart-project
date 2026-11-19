@@ -16,6 +16,18 @@ function baseData(overrides = {}) {
   };
 }
 
+// The official reporting preset starts on 8 Nov, not 18 Nov, in Egypt.
+const official = finance.periodRange("since_launch", {}, new Date("2026-11-19T12:00:00Z"));
+assert.strictEqual(finance.dateInputValue(official.start), "2026-11-08", "Official books begin on 8 November.");
+assert.strictEqual(finance.dateInputValue(official.end), "2026-11-19", "Official period ends on the selected date.");
+const november = finance.periodRange("this_month", {}, new Date("2026-11-19T12:00:00Z"));
+assert.strictEqual(finance.dateInputValue(november.start), "2026-11-08", "November reports must clip prelaunch days.");
+const inStockBeforeLaunch = finance.brandMetrics(baseData({
+  items: [{ itemCode: "OLD-STOCK", modelId: "M1", status: "In stock", createdAt: "2026-11-07", costSnapshot: 100 }],
+  models: [{ modelId: "M1", selling: 160, cost: 100 }],
+}), range("2026-11-08", "2026-11-19"), finance.calculateSummary(baseData(), range("2026-11-08", "2026-11-19")));
+assert.strictEqual(inStockBeforeLaunch.stockCount, 1, "Opening warehouse stock remains visible as an asset.");
+
 const empty = finance.calculateSummary(baseData(), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(empty.netRevenue, 0, "Empty records must produce zero revenue.");
 assert.strictEqual(empty.netProfit, 0, "Empty records must produce zero profit.");
