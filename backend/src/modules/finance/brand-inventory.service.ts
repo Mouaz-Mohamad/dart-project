@@ -1,5 +1,6 @@
 // Read-only Brand drilldowns. Prices, units and demand are derived on the server.
 import type { Pool } from "pg";
+import { OFFICIAL_ACCOUNTING_START } from "./accounting-period.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 
 export const BRAND_METRICS = ["sales", "profit", "cost", "damage", "stockSelling", "stockCost", "models", "colors", "sizes", "lowStock", "deadStock", "overview"] as const;
@@ -134,7 +135,8 @@ export async function readBrandInventory(pool: Pool, metric: BrandMetric, start:
     const models = await client.query<Row>("SELECT model_id,name,selling_minor::text,cost_minor::text,discount_percent,color_options,size_options FROM catalog_models WHERE NOT is_deleted");
     const items = await client.query<Row>("SELECT item_code,model_id,color,size,status,active,is_archived,cost_snapshot_minor::text,created_at FROM inventory_items WHERE NOT is_deleted");
     const lines = await client.query<Row>(`SELECT oi.item_code,oi.model_id,oi.model_name,oi.color,oi.size,o.id::text AS order_id,o.order_code,
-      COALESCE(o.delivered_at,o.updated_at) AS event_at FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.status='Delivered'`);
+      COALESCE(o.delivered_at,o.updated_at) AS event_at FROM order_items oi JOIN orders o ON o.id=oi.order_id
+      WHERE o.status='Delivered' AND o.created_at >= ('${OFFICIAL_ACCOUNTING_START}'::date::timestamp AT TIME ZONE 'Africa/Cairo')`);
     const returns = await readRelationalDashboardDomain(client, "returns") as Row[];
     let waiting: Row[] = [];
     if (visibility.waiting) {
