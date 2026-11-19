@@ -18,7 +18,7 @@
   function cairoDateKey(value) {
     if (!value) return "";
     const text = String(value);
-    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) return text;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return "";
     const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo",
