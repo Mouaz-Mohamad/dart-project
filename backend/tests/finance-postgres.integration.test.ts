@@ -86,6 +86,38 @@ describe("finance SQL snapshot", () => {
     expect((await db.query<{ count: number }>("SELECT count(*)::int AS count FROM finance_records")).rows[0]?.count).toBe(4);
   });
 
+  it("excludes prelaunch test orders delivered later, old receipts and old-created expenses", async () => {
+    await db.exec(`
+      INSERT INTO orders(id,order_code,customer_user_id,final_minor,subtotal_minor,order_discount_minor,shipping_fee_minor,
+        delivery_cost_minor,payment_method,payment_status,amount_paid_minor,created_at,delivered_at,updated_at,status)
+      VALUES
+        ('old-sale','TEST-1','c1',99900,99900,0,0,0,'COD','Paid',99900,
+          '2026-11-07T19:00:00Z','2026-11-09T10:00:00Z','2026-11-09T10:00:00Z','Delivered'),
+        ('new-sale','REAL-1','c2',68050,64500,6450,10000,10000,'COD','Paid',68050,
+          '2026-11-08T10:00:00Z','2026-11-09T11:00:00Z','2026-11-09T11:00:00Z','Delivered');
+      INSERT INTO order_items(id,order_id,item_code,cost_snapshot_minor,discount_minor,discount_source)
+      VALUES ('old-line','old-sale','OLD-PIECE',10000,0,NULL),
+             ('real-line','new-sale','REAL-PIECE',63000,6450,'Campaign');
+      INSERT INTO finance_income_entries(id,kind,status,amount_minor,expected_on,received_on,description,created_at)
+      VALUES ('test-income','Other Income','Received',99900,'2026-11-09','2026-11-09','test','2026-11-07T10:00:00Z'),
+             ('real-income','Other Income','Received',1000,'2026-11-09','2026-11-09','real','2026-11-08T10:00:00Z');
+    `);
+    await db.query("INSERT INTO finance_records(domain,record_id,position,payload) VALUES ('finance_expenses','old-exp',8,$1::jsonb),('finance_expenses','new-exp',9,$2::jsonb),('finance_settlements','old-settle',10,$3::jsonb),('finance_settlements','new-settle',11,$4::jsonb)", [
+      JSON.stringify({id:"old-exp",date:"2026-11-09",createdAt:"2026-11-07T10:00:00Z",status:"Paid",amount:777}),
+      JSON.stringify({id:"new-exp",date:"2026-11-09",createdAt:"2026-11-08T10:00:00Z",status:"Unpaid",amount:12}),
+      JSON.stringify({id:"old-settle",orderId:"TEST-1",settlementDate:"2026-11-09",createdAt:"2026-11-07T10:00:00Z",amountReceived:999,fee:0}),
+      JSON.stringify({id:"new-settle",orderId:"REAL-1",settlementDate:"2026-11-09",createdAt:"2026-11-09T10:00:00Z",amountReceived:580.5,fee:0}),
+    ]);
+    const summary = await new FinanceService(pool().value).summary("2026-11-08", "2026-11-10");
+    expect(summary).toMatchObject({
+      deliveredOrders: 1, soldUnits: 1, netRevenue: 680.5,
+      discountAmount: 64.5, campaignDiscountUnits: 1,
+      netCogs: 630, operatingExpenses: 12, unpaidExpenses: 12,
+      otherIncome: 10, orderCashIn: 580.5, incomeCashIn: 10, cashIn: 590.5,
+      netProfit: 48.5,
+    });
+  });
+
   it("rolls back a real SQL error and releases the connection without changing records", async () => {
     const fixture = pool(true);
     await expect(new FinanceService(fixture.value, "2026-09-01").summary("2026-10-01", "2026-10-02")).rejects.toThrow();
