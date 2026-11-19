@@ -2,6 +2,7 @@
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
 import type { Pool } from "pg";
 import { IncomeService } from "./income.service.js";
+import { OFFICIAL_ACCOUNTING_START, officialCreatedAt } from "./accounting-period.js";
 import { AppError } from "../../http/app-error.js";
 import { readRelationalDashboardDomain } from "../dashboard/relational-domain.store.js";
 import { readBrandInventory, type BrandMetric } from "./brand-inventory.service.js";
@@ -37,10 +38,19 @@ interface DeliveredOrderRow {
   event_at: Date;
   cogs_minor: string;
   sold_units: string;
+  discounted_units?: string;
+  subtotal_minor?: string;
+  order_discount_minor?: string;
+  shipping_fee_minor?: string;
 }
 
 export interface FinanceSummary {
   grossRevenue: number;
+  salesBeforeDiscount?: number;
+  discountAmount?: number;
+  discountedUnits?: number;
+  fullPriceUnits?: number;
+  shippingCharges?: number;
   refunds: number;
   netRevenue: number;
   grossCogs: number;
@@ -435,6 +445,18 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
       : itemCost.get(itemCode) || 0;
   }
 
+  const discountAmountMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.order_discount_minor || 0), 0,
+  );
+  const discountedUnits = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.discounted_units || 0), 0,
+  );
+  const salesBeforeDiscountMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.subtotal_minor || 0) + Number(row.shipping_fee_minor || 0), 0,
+  );
+  const shippingChargesMinor = deliveredRows.reduce(
+    (sum, row) => sum + Number(row.shipping_fee_minor || 0), 0,
+  );
   const grossRevenueMinor = deliveredRows.reduce(
     (sum, row) => sum + Number(row.final_minor || 0),
     0,
@@ -534,6 +556,11 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
 
   const summary: FinanceSummary = {
     grossRevenue: money(grossRevenueMinor),
+    salesBeforeDiscount: money(salesBeforeDiscountMinor),
+    discountAmount: money(discountAmountMinor),
+    discountedUnits,
+    fullPriceUnits: Math.max(0, grossSoldUnits - discountedUnits),
+    shippingCharges: money(shippingChargesMinor),
     refunds: money(refundsMinor),
     netRevenue: money(netRevenueMinor),
     grossCogs: money(grossCogsMinor),
@@ -884,6 +911,9 @@ export class FinanceService {
                 o.order_code,
                 o.customer_user_id::text,
                 o.final_minor::text,
+                o.subtotal_minor::text,
+                o.order_discount_minor::text,
+                o.shipping_fee_minor::text,
                 o.delivery_cost_minor::text,
                 o.payment_method,
                 o.payment_status,
@@ -891,17 +921,20 @@ export class FinanceService {
                 o.amount_refunded_minor::text,
                 COALESCE(o.delivered_at, o.updated_at) AS event_at,
                 COALESCE(sum(oi.cost_snapshot_minor),0)::text AS cogs_minor,
-                count(oi.id)::text AS sold_units
+                count(oi.id)::text AS sold_units,
+                count(oi.id) FILTER (WHERE COALESCE(oi.discount_minor,0)>0)::text AS discounted_units
            FROM orders o
            LEFT JOIN order_items oi ON oi.order_id=o.id
           WHERE o.status='Delivered'
+            -- Exclude a test order even if its delivery happens after launch.
+            AND o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND COALESCE(o.delivered_at, o.updated_at) >=
                 ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND COALESCE(o.delivered_at, o.updated_at) <
                 (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')
           GROUP BY o.id
           ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
-        [start, end],
+        [start, end, OFFICIAL_ACCOUNTING_START],
       );
 
       const acquiredResult = await client.query<AcquiredItemRow>(
@@ -909,8 +942,9 @@ export class FinanceService {
            FROM inventory_items
           WHERE NOT is_deleted
             AND created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
-            AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
-        [start, end],
+            AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')
+            AND created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        [start, end, OFFICIAL_ACCOUNTING_START],
       );
 
       const itemCostResult = await client.query<{
@@ -937,6 +971,14 @@ export class FinanceService {
         deliveredCodesResult.rows.map((row) => row.item_code),
       );
 
+      // A late receipt from an old test order must not inflate the official ledger.
+      const officialOrdersResult = await client.query<{ id: string; order_code: string }>(
+        `SELECT id::text AS id, order_code FROM orders
+          WHERE created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        [OFFICIAL_ACCOUNTING_START],
+      );
+      const officialOrderRefs = new Set(officialOrdersResult.rows.flatMap(row => [row.id, row.order_code]));
+
       const relationalDomains = [
         "returns",
         "damage",
@@ -949,13 +991,30 @@ export class FinanceService {
       // deprecation warning and will become invalid in pg@9.
       const states = new Map<string, JsonRow[]>();
       for (const domain of relationalDomains) {
-        states.set(
-          domain,
-          (await readRelationalDashboardDomain(client, domain)) as JsonRow[],
-        );
+        const rows = (await readRelationalDashboardDomain(client, domain)) as JsonRow[];
+        // Current finance records have createdAt; keep old fixture imports readable.
+        const official = rows.filter(row => !row.createdAt || officialCreatedAt(row.createdAt));
+        if (domain === "finance_settlements" || domain === "returns") {
+          states.set(domain, official.filter(row => {
+            const ref = String(row.orderId || "").trim();
+            return !row.createdAt || !ref || officialOrderRefs.has(ref);
+          }));
+        } else {
+          states.set(domain, official);
+        }
       }
 
-      const incomeResult = await client.query<JsonRow>("SELECT id,kind,status,amount_minor::text,expected_on::text,received_on::text,description FROM finance_income_entries WHERE received_on BETWEEN $1::date AND $2::date OR expected_on BETWEEN $1::date AND $2::date", [start, end]);
+      const incomeResult = await client.query<JsonRow>(
+        `SELECT i.id,i.kind,i.status,i.amount_minor::text,i.expected_on::text,
+                i.received_on::text,i.description
+           FROM finance_income_entries i
+           LEFT JOIN orders o ON o.id=i.order_id
+          WHERE (i.received_on BETWEEN $1::date AND $2::date
+              OR i.expected_on BETWEEN $1::date AND $2::date)
+            AND i.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')
+            AND (i.order_id IS NULL OR o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))`,
+        [start, end, OFFICIAL_ACCOUNTING_START],
+      );
       states.set("finance_income", incomeResult.rows);
 
       const snapshot = { delivered: deliveredResult.rows, acquired: acquiredResult.rows, itemCost, deliveredCodes, states };
