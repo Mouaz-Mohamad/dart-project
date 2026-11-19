@@ -2018,7 +2018,7 @@
       const label = period.start.toLocaleDateString("en-EG", { day: "numeric", month: "short" });
       return { label: dateInputValue(period.start) === dateInputValue(period.end) ? label
           : `${label}–${period.end.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-        revenue: summary.netRevenue, cost: summary.brandTotalCost, profit: summary.brandNetProfit };
+        revenue: summary.netRevenue, cost: summary.totalCost, profit: summary.netProfit };
     });
   }
 
@@ -2033,7 +2033,7 @@
       }
       return;
     }
-    const empty = summary.netRevenue === 0 && summary.brandTotalCost === 0;
+    const empty = summary.netRevenue === 0 && summary.totalCost === 0;
     toggleChartEmpty("dart-financial-empty", empty);
     const canvas = document.getElementById("dart-financial-chart");
     if (canvas) canvas.hidden = empty;
