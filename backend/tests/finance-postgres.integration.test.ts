@@ -11,24 +11,29 @@ beforeEach(async () => {
   await db.exec(`
     CREATE TABLE orders (
       id text PRIMARY KEY, order_code text, customer_user_id text,
-      final_minor bigint, delivery_cost_minor bigint DEFAULT 0, payment_method text,
+      final_minor bigint, subtotal_minor bigint DEFAULT 0, order_discount_minor bigint DEFAULT 0,
+      shipping_fee_minor bigint DEFAULT 0, delivery_cost_minor bigint DEFAULT 0, payment_method text,
       payment_status text, amount_paid_minor bigint, amount_refunded_minor bigint DEFAULT 0,
+      created_at timestamptz DEFAULT '2026-09-30T12:00:00Z',
       delivered_at timestamptz, updated_at timestamptz, status text,
       is_deleted boolean DEFAULT false, is_archived boolean DEFAULT false
     );
-    CREATE TABLE order_items (id text PRIMARY KEY, order_id text, item_code text, cost_snapshot_minor bigint);
+    CREATE TABLE order_items (id text PRIMARY KEY, order_id text, item_code text, cost_snapshot_minor bigint,
+      discount_minor bigint DEFAULT 0, discount_source text);
     CREATE TABLE inventory_items (item_code text PRIMARY KEY, cost_snapshot_minor bigint,
-      created_at timestamptz, is_deleted boolean DEFAULT false);
+      created_at timestamptz, status text DEFAULT 'In stock',active boolean DEFAULT true,
+      is_archived boolean DEFAULT false, is_deleted boolean DEFAULT false);
     CREATE TABLE return_requests (record_id text, position integer, payload jsonb);
     CREATE TABLE damage_records (record_id text, position integer, payload jsonb);
-    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,description text);
+    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,
+      description text,order_id text,created_at timestamptz DEFAULT '2026-09-30T12:00:00Z');
     CREATE TABLE finance_records (domain text, record_id text, position integer, payload jsonb);
     INSERT INTO orders (id,order_code,customer_user_id,final_minor,payment_method,payment_status,
       amount_paid_minor,delivered_at,updated_at,status) VALUES
       ('o1','K-1','c1',10101,'Card','Paid',10101,'2026-09-30T21:00:00Z','2026-09-30T21:00:00Z','Delivered'),
       ('o2','K-2','c1',22202,'Card','Paid',22202,'2026-10-01T21:00:00Z','2026-10-01T21:00:00Z','Delivered'),
       ('outside','K-3','c2',99900,'Card','Paid',99900,'2026-10-02T21:00:00Z','2026-10-02T21:00:00Z','Delivered');
-    INSERT INTO order_items VALUES ('line1','o1','I-1',2001), ('line2','o2','I-2',3002);
+    INSERT INTO order_items(id,order_id,item_code,cost_snapshot_minor) VALUES ('line1','o1','I-1',2001), ('line2','o2','I-2',3002);
     INSERT INTO inventory_items (item_code,cost_snapshot_minor,created_at) VALUES
       ('before',99900,'2026-09-30T20:59:59Z'), ('I-1',3001,'2026-09-30T21:00:00Z'),
       ('I-2',7002,'2026-10-01T21:00:00Z'), ('after',99900,'2026-10-02T21:00:00Z');
@@ -75,7 +80,7 @@ describe("finance SQL snapshot", () => {
     expect(results[0]?.netProfit).toBe(173);
     expect(fixture.connect).toHaveBeenCalledOnce();
     expect(fixture.release).toHaveBeenCalledOnce();
-    expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(10);
+    expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(11);
     expect(fixture.queries[0]).toBe("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     expect(fixture.queries.at(-1)).toBe("COMMIT");
     expect((await db.query<{ count: number }>("SELECT count(*)::int AS count FROM finance_records")).rows[0]?.count).toBe(4);
