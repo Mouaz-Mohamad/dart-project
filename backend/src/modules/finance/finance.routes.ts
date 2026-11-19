@@ -156,6 +156,8 @@ export function financeSummarySection(
   if (section === "inventory") {
     return {
       physicalItemCost: summary.physicalItemCost,
+      currentStockCost: summary.currentStockCost ?? 0,
+      currentStockUnits: summary.currentStockUnits ?? 0,
       incrementalDamage: summary.incrementalDamage,
       damageValue: summary.damageValue,
     };
