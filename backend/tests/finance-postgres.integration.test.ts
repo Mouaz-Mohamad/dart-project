@@ -61,7 +61,7 @@ function pool(failSql = false) {
 describe("finance SQL snapshot", () => {
   it("reads ten relations once, preserves Cairo midnight boundaries and excludes archived expense payloads", async () => {
     const fixture = pool();
-    const results = await new FinanceService(fixture.value).summaries([
+    const results = await new FinanceService(fixture.value, "2026-09-01").summaries([
       { start: "2026-10-01", end: "2026-10-02" },
       { start: "2026-10-01", end: "2026-10-01" },
       { start: "2026-10-02", end: "2026-10-02" },
@@ -83,7 +83,7 @@ describe("finance SQL snapshot", () => {
 
   it("rolls back a real SQL error and releases the connection without changing records", async () => {
     const fixture = pool(true);
-    await expect(new FinanceService(fixture.value).summary("2026-10-01", "2026-10-02")).rejects.toThrow();
+    await expect(new FinanceService(fixture.value, "2026-09-01").summary("2026-10-01", "2026-10-02")).rejects.toThrow();
     expect(fixture.queries.at(-1)).toBe("ROLLBACK");
     expect(fixture.release).toHaveBeenCalledOnce();
     expect((await db.query<{ count: number }>("SELECT count(*)::int AS count FROM orders")).rows[0]?.count).toBe(3);
