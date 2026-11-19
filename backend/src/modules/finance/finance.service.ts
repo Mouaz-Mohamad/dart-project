@@ -57,6 +57,7 @@ export interface FinanceSummary {
   cogsReversal: number;
   netCogs: number;
   operatingExpenses: number;
+  unpaidExpenses?: number;
   codFees: number;
   damageLoss: number;
   damageValue: number;
@@ -366,6 +367,11 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     .filter((row) => !isInventoryAcquisitionExpense(row) && !isFinancingExpense(row))
     .filter((row) => inRange(row.date, start, end))
     .reduce((sum, row) => sum + toMinor(row.amount), 0);
+  const unpaidExpensesMinor = expenses
+    .filter(row => String(row.status || "").toLowerCase() === "unpaid")
+    .filter(row => !isInventoryAcquisitionExpense(row) && !isFinancingExpense(row))
+    .filter(row => inRange(row.date, start, end))
+    .reduce((sum, row) => sum + toMinor(row.amount), 0);
   const paidExpenseMinor = expenses
     .filter((row) => String(row.status || "").toLowerCase() === "paid")
     .filter((row) => !isInventoryAcquisitionExpense(row) && !isFinancingExpense(row))
@@ -567,6 +573,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     cogsReversal: money(cogsReversalMinor),
     netCogs: money(netCogsMinor),
     operatingExpenses: money(operatingExpenseMinor),
+    unpaidExpenses: money(unpaidExpensesMinor),
     codFees: money(codFeesMinor),
     damageLoss: money(damageLossMinor),
     damageValue: money(damageValueMinor),
