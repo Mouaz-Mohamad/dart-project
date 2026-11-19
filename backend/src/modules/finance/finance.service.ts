@@ -51,6 +51,8 @@ export interface FinanceSummary {
   discountedUnits?: number;
   fullPriceUnits?: number;
   shippingCharges?: number;
+  currentStockCost?: number;
+  currentStockUnits?: number;
   refunds: number;
   netRevenue: number;
   grossCogs: number;
@@ -246,6 +248,8 @@ export interface FinanceSnapshot {
   itemCost: Map<string, number>;
   deliveredCodes: Set<string>;
   states: Map<string, JsonRow[]>;
+  currentStockCostMinor?: number;
+  currentStockUnits?: number;
 }
 
 export interface BrandLedgerRow {
@@ -567,6 +571,8 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     discountedUnits,
     fullPriceUnits: Math.max(0, grossSoldUnits - discountedUnits),
     shippingCharges: money(shippingChargesMinor),
+    currentStockCost: money(snapshot.currentStockCostMinor || 0),
+    currentStockUnits: snapshot.currentStockUnits || 0,
     refunds: money(refundsMinor),
     netRevenue: money(netRevenueMinor),
     grossCogs: money(grossCogsMinor),
@@ -957,8 +963,12 @@ export class FinanceService {
       const itemCostResult = await client.query<{
         item_code: string;
         cost_snapshot_minor: string;
+        status: string;
+        active: boolean;
+        is_deleted: boolean;
+        is_archived: boolean;
       }>(
-        `SELECT item_code, cost_snapshot_minor::text
+        `SELECT item_code, cost_snapshot_minor::text, status,active,is_deleted,is_archived
            FROM inventory_items`,
       );
       const itemCost = new Map(
@@ -967,6 +977,14 @@ export class FinanceService {
           Number(row.cost_snapshot_minor || 0),
         ]),
       );
+      const stock = itemCostResult.rows.filter(row => (
+        !row.is_deleted && !row.is_archived && row.active !== false &&
+        ["in stock", "cart reserved"].includes(String(row.status || "").toLowerCase())
+      ));
+      const currentStockCostMinor = stock.reduce(
+        (sum, row) => sum + Number(row.cost_snapshot_minor || 0), 0,
+      );
+      const currentStockUnits = stock.length;
 
       const deliveredCodesResult = await client.query<{ item_code: string }>(
         `SELECT DISTINCT oi.item_code
@@ -1024,7 +1042,10 @@ export class FinanceService {
       );
       states.set("finance_income", incomeResult.rows);
 
-      const snapshot = { delivered: deliveredResult.rows, acquired: acquiredResult.rows, itemCost, deliveredCodes, states };
+      const snapshot = {
+        delivered: deliveredResult.rows, acquired: acquiredResult.rows,
+        itemCost, deliveredCodes, states, currentStockCostMinor, currentStockUnits,
+      };
       await client.query("COMMIT");
       return snapshot;
     } catch (error) {
