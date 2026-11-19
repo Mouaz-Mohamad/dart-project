@@ -14,7 +14,7 @@
   "use strict";
 
   // Test bookkeeping before launch is retained but excluded from official reporting.
-  const ACCOUNTING_LAUNCH_DAY = "2026-11-18";
+  const ACCOUNTING_LAUNCH_DAY = "2026-11-08";
   function cairoDateKey(value) {
     if (!value) return "";
     const text = String(value);
@@ -332,7 +332,7 @@
 
     if (preset === "since_launch") {
       start = startOfDay(ACCOUNTING_LAUNCH_DAY);
-      label = "Official records · since 18 Nov 2026";
+      label = "Official records · since 8 Nov 2026";
     } else if (preset === "last_7") {
       start = startOfDay(addDays(now, -6));
       label = "Last 7 Days";
@@ -387,7 +387,7 @@
     const officialStart = startOfDay(ACCOUNTING_LAUNCH_DAY);
     if (end >= officialStart && start < officialStart) {
       start = officialStart;
-      label = `${label} · from 18 Nov 2026`;
+      label = `${label} · from 8 Nov 2026`;
     } else if (end < officialStart) {
       label = `${label} · pre-launch test period (excluded)`;
     }
@@ -1623,7 +1623,7 @@
       if (!select.querySelector('option[value="since_launch"]')) {
         const option = document.createElement("option");
         option.value = "since_launch";
-        option.textContent = "Since Launch · 18 Nov 2026";
+        option.textContent = "Since Launch · 8 Nov 2026";
         select.insertBefore(option, select.firstChild);
       }
       select.value = state.period.preset;
