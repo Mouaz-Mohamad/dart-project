@@ -680,7 +680,10 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
 
 export class FinanceService {
   public readonly incomes: IncomeService;
-  public constructor(private readonly pool: Pool) { this.incomes = new IncomeService(pool); }
+  // Optional earlier start enables legacy financial formula fixtures; production always uses 8 Nov.
+  public constructor(private readonly pool: Pool, private readonly officialStart = OFFICIAL_ACCOUNTING_START) {
+    this.incomes = new IncomeService(pool);
+  }
 
   public async brandDetails(metric: BrandMetric, start: string, end: string,
     page: number, limit: number, visibility: { costs: boolean; waiting: boolean; sales: boolean }) {
@@ -976,7 +979,7 @@ export class FinanceService {
                 (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')
           GROUP BY o.id
           ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
-        [start, end, OFFICIAL_ACCOUNTING_START],
+        [start, end, this.officialStart],
       );
 
       const acquiredResult = await client.query<AcquiredItemRow>(
@@ -986,7 +989,7 @@ export class FinanceService {
             AND created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')
             AND created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
-        [start, end, OFFICIAL_ACCOUNTING_START],
+        [start, end, this.officialStart],
       );
 
       const itemCostResult = await client.query<{
@@ -1030,7 +1033,7 @@ export class FinanceService {
         `SELECT id::text AS id, order_code FROM orders
           WHERE created_at >= ($1::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
-        [OFFICIAL_ACCOUNTING_START, end],
+        [this.officialStart, end],
       );
       const officialOrderRefs = new Set(officialOrdersResult.rows.flatMap(row => [row.id, row.order_code]));
 
@@ -1068,7 +1071,7 @@ export class FinanceService {
               OR i.expected_on BETWEEN $1::date AND $2::date)
             AND i.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo')
             AND (i.order_id IS NULL OR o.created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))`,
-        [start, end, OFFICIAL_ACCOUNTING_START],
+        [start, end, this.officialStart],
       );
       states.set("finance_income", incomeResult.rows);
 
