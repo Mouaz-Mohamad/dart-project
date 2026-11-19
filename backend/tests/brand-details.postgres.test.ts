@@ -9,19 +9,26 @@ describe("Brand detail SQL", () => {
     const db = new PGlite();
     try {
       await db.exec(`
-        CREATE TABLE orders(id text PRIMARY KEY,order_code text,customer_user_id text,final_minor bigint,delivery_cost_minor bigint,
-          payment_method text,payment_status text,amount_paid_minor bigint,amount_refunded_minor bigint,delivered_at timestamptz,updated_at timestamptz,status text);
-        CREATE TABLE order_items(id text,order_id text,item_code text,model_id text,model_name text,color text,size text,cost_snapshot_minor bigint);
+        CREATE TABLE orders(id text PRIMARY KEY,order_code text,customer_user_id text,final_minor bigint,subtotal_minor bigint DEFAULT 0,
+          order_discount_minor bigint DEFAULT 0,shipping_fee_minor bigint DEFAULT 0,delivery_cost_minor bigint,
+          payment_method text,payment_status text,amount_paid_minor bigint,amount_refunded_minor bigint,
+          created_at timestamptz DEFAULT '2026-10-10T10:00Z',delivered_at timestamptz,updated_at timestamptz,status text);
+        CREATE TABLE order_items(id text,order_id text,item_code text,model_id text,model_name text,color text,size text,
+          cost_snapshot_minor bigint,discount_minor bigint DEFAULT 0,discount_source text);
         CREATE TABLE catalog_models(model_id text,name text,selling_minor bigint,cost_minor bigint,discount_percent numeric,color_options jsonb,size_options jsonb,is_deleted boolean DEFAULT false);
         CREATE TABLE inventory_items(item_code text,cost_snapshot_minor bigint,model_id text,color text,size text,status text,active boolean,is_archived boolean DEFAULT false,is_deleted boolean DEFAULT false,created_at timestamptz);
         CREATE TABLE return_requests(record_id text,position int,payload jsonb);
         CREATE TABLE damage_records(record_id text,position int,payload jsonb);
-    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,description text);
+    CREATE TABLE finance_income_entries(id text,kind text,status text,amount_minor bigint,expected_on date,received_on date,
+          description text,order_id text,created_at timestamptz DEFAULT '2026-10-10T10:00Z');
         CREATE TABLE finance_records(domain text,record_id text,position int,payload jsonb);
         CREATE TABLE waitlist_entries(model_id text,desired_color text,size text,status text);
         CREATE TABLE set_waiting_entries(selections jsonb,status text);
-        INSERT INTO orders VALUES ('o1','O1','c1',50001,0,'COD','Paid',50001,0,'2026-10-10T12:00Z','2026-10-10T12:00Z','Delivered');
-        INSERT INTO order_items VALUES ('l1','o1','sold','M1','Hoodie','Black','M',12001);
+        INSERT INTO orders(id,order_code,customer_user_id,final_minor,delivery_cost_minor,payment_method,
+          payment_status,amount_paid_minor,amount_refunded_minor,delivered_at,updated_at,status)
+          VALUES ('o1','O1','c1',50001,0,'COD','Paid',50001,0,'2026-10-10T12:00Z','2026-10-10T12:00Z','Delivered');
+        INSERT INTO order_items(id,order_id,item_code,model_id,model_name,color,size,cost_snapshot_minor)
+          VALUES ('l1','o1','sold','M1','Hoodie','Black','M',12001);
         INSERT INTO catalog_models(model_id,name,selling_minor,cost_minor,discount_percent,color_options,size_options)
           VALUES ('M1','Hoodie',50001,12001,15,'["Black"]','["M"]');
         INSERT INTO inventory_items(item_code,cost_snapshot_minor,model_id,color,size,status,active,created_at) VALUES
