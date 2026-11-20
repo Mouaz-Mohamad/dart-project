@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp, isPublicReadRateLimitPath } from "../src/application.js";
 import { loadConfig } from "../src/config/env.js";
 import type { CatalogService } from "../src/modules/catalog/catalog.service.js";
+import type { IdentityService } from "../src/modules/identity/identity.service.js";
 import { registerSharedRateLimits } from "../src/security/shared-rate-limit.js";
 
 describe("public read limits without database amplification", () => {
@@ -24,7 +25,7 @@ describe("public read limits without database amplification", () => {
     const dbQuery = vi.fn().mockResolvedValue({ rows: [{ hits: "1", expires_at: new Date(Date.now() + 60_000) }] });
     registerSharedRateLimits(config, { query: dbQuery } as unknown as Pool, config.authPepper);
     const catalog = { version: vi.fn().mockResolvedValue(1), publicCatalog: vi.fn().mockResolvedValue({ version: 1, models: [], stock: {} }) };
-    const app = createApp(config, { catalogService: catalog as unknown as CatalogService, databasePing: async () => undefined, logger: pino({ level: "silent" }), startedAt: new Date(), version: "test" });
+    const app = createApp(config, { catalogService: catalog as unknown as CatalogService, identityService: {} as IdentityService, databasePing: async () => undefined, logger: pino({ level: "silent" }), startedAt: new Date(), version: "test" });
     expect((await request(app).get("/api/v1/catalog/version")).status).toBe(200);
     expect((await request(app).get("/api/v1/catalog")).status).toBe(200);
     const denied = await request(app).get("/api/v1/catalog/version");
