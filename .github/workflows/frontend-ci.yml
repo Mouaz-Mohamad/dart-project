@@ -135,6 +135,7 @@ jobs:
           node tests/finance-state-integration.cjs
           node tests/finance-ui-runtime.cjs
           node tests/dashboard-refresh-runtime.cjs
+          node tests/brand-top-clients-performance.cjs
           node tests/dashboard-dynamic-filters.cjs
           node tests/server-authority-contract.js
           node tests/settings-and-groups-unit.js
