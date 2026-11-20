@@ -1436,7 +1436,7 @@
                 <article class="dart-coverage-fieldset" aria-labelledby="shipping-coverage-heading">
                   <h4 id="shipping-coverage-heading">Delivery Coverage · مناطق التوصيل</h4>
                   <p>اختر المحافظات ثم خصّص المدن والمناطق. لا توجد كتابة يدوية للأسماء.</p>
-                  <p>لتلقي طلبات من المحافظة، فعّل الشركة وAccept orders in Checkout، وتأكد أن المحافظة غير موقوفة في Delivery Policy.</p>
+                  <p>لتلقي أوردرات من المحافظة، فعّل الشركة وخيار استقبال الأوردرات في إتمام الطلب، وتأكد إن المحافظة مش محظورة في سياسة التوصيل.</p>
                   <div id="shipping-coverage-picker"></div>
                   <p id="shipping-coverage-warning" role="status" aria-live="polite"></p>
                 </article>
@@ -2615,7 +2615,7 @@
                 <article id="settings-dart-card-system" data-settings-group="loyalty" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></div>
                     <div class="dart-settings-card-copy"><span>LOYALTY SYSTEM</span><h2>Dart Card System</h2>
-                        <p>OFF يوقف الخصم والسحب والإصدار ويخفي النظام عن العملاء، مع حفظ البطاقات وتجميد مدة الصلاحية.</p></div>
+                        <p>إيقاف النظام بيوقف الخصم والسحب والإصدار ويخفي النظام عن العملاء، مع حفظ البطاقات وتجميد مدة الصلاحية.</p></div>
                     <form id="settings-dart-card-switch-form" class="dart-settings-fields">
                         <label class="dart-settings-check" for="settings-dart-card-enabled">
                             <input id="settings-dart-card-enabled" type="checkbox"> Enable Dart Card System
@@ -2666,7 +2666,7 @@
                     <div class="dart-settings-card-copy">
                         <span>COD RISK &amp; VERIFICATION</span>
                         <h2>Order verification policy</h2>
-                        <p>أول رفض يشدد التحقق، ورفضان داخل نافذة الرفض يدخلان Manual Review. القيم الخاصة بسرعة تكرار الطلب وقيمة الطلب قابلة للتعديل وليست قواعد مخفية في الكود.</p>
+                        <p>أول رفض بيشدد التحقق، ورفضين خلال الفترة المحددة بيخلّوا الأوردر يحتاج مراجعة يدوية. القيم الخاصة بسرعة تكرار الطلب وقيمة الطلب قابلة للتعديل وليست قواعد مخفية في الكود.</p>
                     </div>
                     <form id="settings-cod-risk-form" class="dart-settings-fields">
                         <label for="settings-cod-risk-version">Policy version<input id="settings-cod-risk-version" type="number" min="1" step="1" readonly></label>
@@ -2818,7 +2818,7 @@
                     <div class="dart-settings-card-copy">
                         <span>HERO WORDS</span>
                         <h2>Typing animation</h2>
-                        <p>كل مجموعة جملة تظهر وتتمسح معًا. رتّب الجمل والكلمات من الأزرار، وافتح Word settings لتعديل تنسيق كل كلمة أو نقلها لجملة أخرى.</p>
+                        <p>كل مجموعة جملة تظهر وتتمسح معًا. رتّب الجمل والكلمات من الأزرار، وافتح إعدادات الكلمة لتعديل شكلها أو نقلها لجملة تانية.</p>
                     </div>
                     <form id="settings-typing-form" class="dart-settings-fields">
                         <label for="settings-typing-speed">Typing speed ms<input id="settings-typing-speed" type="number" min="10" step="1"></label>
@@ -2847,7 +2847,7 @@
 
                 <article id="settings-model-cards-card" data-settings-group="storefront" class="dart-settings-card dart-settings-form-card dart-settings-wide">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-shirt"></i></div>
-                    <div class="dart-settings-card-copy"><span>PRODUCT CARDS</span><h2>Colors shown per model</h2><p>يتطبق على Home وProducts، بينما نافذة الموديل تظل تعرض كل ألوان التصميم.</p></div>
+                    <div class="dart-settings-card-copy"><span>PRODUCT CARDS</span><h2>Colors shown per model</h2><p>بيتطبق على الرئيسية والمنتجات، بينما تفاصيل الموديل بتفضل تعرض كل ألوانه.</p></div>
                     <form id="settings-model-cards-form">
                         <div id="settings-model-cards-list" class="dart-settings-list"></div>
                         <button id="save-model-card-settings" type="submit" class="dart-settings-save">Save product card display</button>
@@ -2890,7 +2890,7 @@
                     <div class="dart-settings-card-copy">
                         <span>STAFF ACCESS</span>
                         <h2>Dashboard access &amp; API permissions</h2>
-                        <p>أضف الإيميل وحدد نوع الحساب. عند أول دخول يثبت صاحب الإيميل ملكيته بكود واحد، وبعدها يعتمد النظام على جلسة Dart الآمنة بدون Password أو Google Login.</p>
+                        <p>أضف الإيميل وحدد نوع الحساب. عند أول دخول يثبت صاحب الإيميل ملكيته بكود واحد، وبعدها يعتمد النظام على جلسة Dart الآمنة من غير كلمة مرور أو تسجيل دخول Google.</p>
                     </div>
                     <details id="settings-staff-add" class="dart-settings-field-wide"><summary>Add Staff</summary>
                     <form id="settings-staff-invite-form" class="dart-settings-fields">
@@ -2926,7 +2926,7 @@
                     <div class="dart-settings-card-copy">
                         <span>CUSTOMER IDENTITY</span>
                         <h2>Verified Email Link Requests</h2>
-                        <p>طلبات إضافة بريد إلكتروني للعملاء المسجلين بأرقام هاتف فقط. تم تأكيد البريد بالـOTP،
+                        <p>طلبات إضافة بريد إلكتروني للعملاء المسجلين بأرقام هاتف فقط. تم تأكيد الإيميل برمز التحقق،
                           لكن لا يُسمح بفتح الحساب إلا بعد اتصالك برقم العميل المسجل والتحقق من ملكيته. اعتمد أو ارفض كل طلب بنفسك.</p>
                     </div>
                     <button type="button" id="settings-customer-email-links-refresh" class="dart-settings-secondary">Refresh requests</button>
