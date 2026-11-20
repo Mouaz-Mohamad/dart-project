@@ -151,6 +151,8 @@ if (!settingsRuntime.includes('[data-target="models"]')) {
 
 // This script is loaded only by the standalone WhatsApp feedback page, not
 // by any general storefront/dashboard page. Budget it independently.
+// Arabic labels ship only on the private dashboard and courier portal, not the storefront.
+const internalUiLocalizationFiles = new Set(["Js/dart-admin-ar.js"]);
 const standaloneScripts = new Set(["Js/dart-public-feedback.js"]);
 const settingsFeatureFiles = new Set([
   "Eye/dart-settings-shortcuts.js",
@@ -172,6 +174,7 @@ let emailLinkPageBytes = 0;
 let coreJsBytes = 0;
 let lazyJsBytes = 0;
 let standaloneJsBytes = 0;
+let internalUiLocalizationBytes = 0;
 let coverageFeatureBytes = 0;
 let settingsFeatureBytes = 0;
 let brandDetailsBytes = 0;
@@ -190,6 +193,7 @@ for (const file of jsFiles) {
   else if (file === "Js/dart-merchandising.js") merchandisingBytes += size;
   else if (file === "Eye/dart-customer-details.js") customerDetailsBytes += size;
   else if (file === "Eye/dart-brand-details.js") brandDetailsBytes += size;
+  else if (internalUiLocalizationFiles.has(file)) internalUiLocalizationBytes += size;
   else if (standaloneScripts.has(file)) standaloneJsBytes += size;
   else if (coverageFeatureFiles.has(file)) coverageFeatureBytes += size;
   else if (settingsFeatureFiles.has(file)) settingsFeatureBytes += size;
@@ -224,6 +228,19 @@ if (!/src="dart-shipping-loader\.js(?:\?[^\"]*)?"/.test(dashboardHtml)) {
 }
 if (!fs.readFileSync("cart-checkout.html","utf8").includes('src="Js/dart-checkout-regions.js"')) {
   failures.push("Checkout city suggestions are not page-scoped");
+}
+// This 5-6 KiB helper is fetched by internal pages only; the 66 KiB Arabic
+// translations are a separate JSON data asset, not executable JavaScript.
+if (internalUiLocalizationBytes > 8 * 1024) {
+  failures.push("Private dashboard/courier Arabic label helper exceeds its 8 KiB cap");
+}
+for (const file of rootHtml.filter((file) => file !== "rep.html")) {
+  if (/src=["'][^"']*dart-admin-ar\.js/.test(fs.readFileSync(file, "utf8"))) {
+    failures.push(file + ": Arabic admin helper must remain private-page scoped");
+  }
+}
+if (!dashboardHtml.includes("dart-admin-ar.js") || !fs.readFileSync("rep.html", "utf8").includes("dart-admin-ar.js")) {
+  failures.push("Arabic admin helper must load on dashboard and courier portal");
 }
 if (standaloneJsBytes > 8 * 1024) {
   failures.push("Standalone public feedback runtime exceeds its 8KB budget");
