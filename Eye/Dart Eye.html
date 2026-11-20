@@ -2622,6 +2622,20 @@
                         <p id="settings-dart-card-switch-status" class="dart-settings-field-wide" role="status" aria-live="polite"></p>
                     </form>
                 </article>
+                <article id="settings-shopping-bar-card" data-settings-group="loyalty" class="dart-settings-card dart-settings-form-card dart-settings-wide">
+                    <div class="dart-settings-card-copy"><span>SHOPPING BAR</span><h2>Smart shopping bar</h2>
+                        <p>الشريط يعرض العرض المناسب لسلة العميل بعد التحقق من شروطه. تحكم في كل عرض وحد ظهور رسالته من Campaign manager بالأسفل. إغلاق الشريط يخفيه حتى تتغير السلة.</p></div>
+                    <form id="settings-shopping-bar-form" class="dart-settings-fields">
+                        <label class="dart-settings-check"><input id="settings-shopping-bar-enabled" type="checkbox" checked> Show personalized offers</label>
+                        <label>Added confirmation duration (seconds)<input id="settings-shopping-bar-duration" type="number" min="4" max="30" value="6" required></label>
+                        <label class="dart-settings-check"><input id="settings-card-goal-enabled" type="checkbox"> Enable one-time purchase goal Dart Card</label>
+                        <label>Paid delivered pieces to earn a card<input id="settings-card-goal-target" type="number" min="2" max="10000" value="10" required></label>
+                        <label>Show card message when remaining pieces ≤<input id="settings-card-goal-within" type="number" min="0" max="100" value="4" required></label>
+                        <label class="dart-settings-field-wide">Card progress message<input id="settings-card-goal-message" type="text" maxlength="240" placeholder="فاضلك {remaining} قطعة مستلمة وتحصل على Dart Card"></label>
+                        <p class="dart-settings-field-wide">هدف الشراء اختياري ومستقل عن السحب الشهري. يحسب القطع المدفوعة التي تم تسليمها بعد خصم المرتجع، ويمنح كارتًا مرة واحدة للعميل عند تأكيد تسليم طلب يكمل الهدف. الكارت المكتسب يحتفظ بصلاحيته. له 10 قطع لمدة سنة، ويستخدم نسبة Dart Card المحددة. يلزم تفعيل Dart Card؛ العميل صاحب الكارت الفعال لا تصله رسالة استحقاق جديدة.</p>
+                        <button type="submit" class="dart-settings-save">Save shopping bar</button>
+                    </form>
+                </article>
                 <article id="settings-commerce-card" data-settings-group="sales" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></div>
                     <div class="dart-settings-card-copy">
@@ -2712,10 +2726,15 @@
                         <input id="settings-promotion-id" type="hidden"><input id="settings-promotion-version" type="hidden">
                         <label>Campaign name<input id="settings-promotion-name" type="text" maxlength="160" required></label>
                         <label>Code<input id="settings-promotion-code" type="text" maxlength="60" pattern="[A-Za-z0-9_-]+" required></label>
-                        <label>Discount type<select id="settings-promotion-kind"><option value="percent">Percentage</option><option value="fixed">Fixed amount (quantity offer)</option></select></label>
+                        <label>Reward type<select id="settings-promotion-kind"><option value="percent">Percentage</option><option value="fixed">Fixed amount (quantity offer)</option><option value="freeShipping">Free shipping</option><option value="gift">Buy pieces, get a gift piece</option></select></label>
                         <label>Discount %<input id="settings-promotion-percent" type="number" min="0" max="100" step="0.01" value="0" required></label>
                         <label>Fixed saving (EGP)<input id="settings-promotion-amount" type="number" min="0" max="10000000" step="0.01" value="0"></label>
                         <label class="dart-settings-check"><input id="settings-promotion-distinct" type="checkbox"> Quantity offer — different models only</label>
+                        <label>Gift pieces per order<input id="settings-promotion-gift-quantity" type="number" min="1" max="20" value="1"></label>
+                        <label class="dart-settings-check"><input id="settings-promotion-bar-enabled" type="checkbox"> Show in smart shopping bar</label>
+                        <label>Show when remaining pieces/models ≤<input id="settings-promotion-bar-within" type="number" min="0" max="100" value="4"></label>
+                        <label class="dart-settings-field-wide">Progress message<input id="settings-promotion-bar-message" type="text" maxlength="240" placeholder="فاضلك {remaining} وتستفيد بـ{reward}"></label>
+                        <p class="dart-settings-field-wide">مثال قطعتين والثالثة هدية: Reward = Gift، Minimum eligible pieces = 3، Gift pieces = 1. العميل يختار القطع الثلاث ويُخصم سعر الأقل سعرًا تلقائيًا مرة واحدة في الأوردر. رسالة الشريط تقبل {remaining} و{target} و{reward}. التوصيل المجاني يخفض رسوم الشحن بالفعل عند إكمال الشروط.</p>
                         <label class="dart-settings-field-wide">Promotional message<input id="settings-promotion-message" type="text" maxlength="240" placeholder="كمّل اللوك واستفيد بعرض العدد"></label>
                         <p class="dart-settings-field-wide">عرض العدد يُطبق تلقائيًا داخل أوردر واحد. القطع ذات الخصم المستقل والطقمات لا تُحسب. عند كسر شرط العرض بالمرتجع يُعاد حساب الخصم ويُسوّى الفرق من الاسترداد.</p>
                         <label>Status<select id="settings-promotion-status"><option>Draft</option><option>Scheduled</option><option>Active</option><option>Paused</option><option>Expired</option></select></label>

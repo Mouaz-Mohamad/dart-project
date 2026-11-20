@@ -7,6 +7,7 @@ import { AppError } from "../../http/app-error.js";
 import { customerDetails, type CustomerDetailSection } from "./customer-details.service.js";
 import { saveManualDiscount, type ManualDiscountInput } from "./customer-manual-discount.js";
 import { DiscountCodeService, type DiscountCode, type DiscountCodeInput } from "./discount-code.js";
+import { cardGoalProgress } from "../loyalty/card-purchase-goal.js";
 
 const conditionField = z.enum([
   "ordersCount",
@@ -39,7 +40,13 @@ export const promotionCampaignInputSchema = z.object({
   code: z.string().trim().min(2).max(60).regex(/^[A-Za-z0-9_-]+$/).transform((value) => value.toUpperCase()),
   status: z.enum(["Draft","Scheduled","Active","Paused","Expired"]).default("Draft"),
   discountPercent: z.number().finite().min(0).max(100),
-  discountKind: z.enum(["percent", "fixed"]).default("percent"),
+  discountKind: z.enum(["percent", "fixed", "freeShipping", "gift"]).default("percent"),
+  giftQuantity: z.number().int().min(1).max(20).default(1),
+  smartBar: z.object({
+    enabled: z.boolean().default(false),
+    showWithin: z.number().int().min(0).max(100).default(4),
+    message: z.string().trim().max(240).default(""),
+  }).strict().default({ enabled: false, showWithin: 4, message: "" }),
   discountAmountMinor: z.number().int().min(0).max(1_000_000_000).default(0),
   distinctModels: z.boolean().default(false),
   marketingText: z.string().trim().max(240).default(""),
@@ -69,6 +76,18 @@ export const promotionCampaignInputSchema = z.object({
   }
   if (value.distinctModels && (value.minQuantity < 2 || !value.automatic)) {
     context.addIssue({ code: "custom", path: ["minQuantity"], message: "Quantity offers require at least two different models and automatic application" });
+  }
+  if (["freeShipping", "gift"].includes(value.discountKind) && (!value.automatic || value.minQuantity < 2)) {
+    context.addIssue({ code: "custom", path: ["minQuantity"], message: "Shipping and gift offers require automatic application and a quantity threshold of at least two" });
+  }
+  if (value.discountKind === "gift" && value.giftQuantity >= value.minQuantity) {
+    context.addIssue({ code: "custom", path: ["giftQuantity"], message: "Gift quantity must be smaller than the qualifying quantity" });
+  }
+  if (value.smartBar.enabled && !value.automatic) {
+    context.addIssue({ code: "custom", path: ["smartBar"], message: "Shopping progress requires an automatically applied campaign" });
+  }
+  if (["freeShipping", "gift"].includes(value.discountKind) && value.discountPercent !== 0) {
+    context.addIssue({ code: "custom", path: ["discountPercent"], message: "Choose either a price percentage or a shipping/gift reward" });
   }
   if (value.startsAt && value.endsAt && value.endsAt < value.startsAt) {
     context.addIssue({ code: "custom", path: ["endsAt"], message: "endsAt must be on or after startsAt" });
@@ -189,6 +208,8 @@ function normalizedCampaign(row: { record_id: string; version: string | number; 
     discountAmountMinor: Number(legacy.discountAmountMinor || 0),
     distinctModels: Boolean(legacy.distinctModels),
     marketingText: String(legacy.marketingText || ""),
+    giftQuantity: legacy.giftQuantity ?? 1,
+    smartBar: legacy.smartBar,
     totalUsageLimit: Number(legacy.totalUsageLimit || 0),
     perCustomerUsageLimit: Number(legacy.perCustomerUsageLimit || 0),
     limitBasis: legacy.limitBasis || "orders",
@@ -213,6 +234,14 @@ function campaignPayload(input: PromotionCampaignInput): Record<string, unknown>
 
 export class PromotionService {
   public constructor(private readonly pool: Pool) {}
+
+  public async cardProgress(customerUserId: string) {
+    const client = await this.pool.connect();
+    try {
+      const settings = (await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main'")).rows[0]?.data || {};
+      return { incentives: await cardGoalProgress(client, customerUserId, settings) };
+    } finally { client.release(); }
+  }
 
   public listDiscountCodes() { return new DiscountCodeService(this.pool).list(); }
   public deleteDiscountCode(id:string,version:number,actor:string,requestId:string) {
@@ -456,6 +485,7 @@ export class PromotionService {
           : campaign.audience !== "all" || Boolean(campaign.customerRules)) continue;
         if (!await this.campaignUsageAllowed(client, campaign, customerUserId || null)) continue;
         offers.push({ id: campaign.id, code: campaign.code, name: campaign.name, discountPercent: campaign.discountPercent,
+          giftQuantity: campaign.giftQuantity, distinctModels: campaign.distinctModels,
           discountKind: campaign.discountKind, discountAmountMinor: campaign.discountAmountMinor, minQuantity: campaign.minQuantity,
           minOrderMinor: campaign.minOrderMinor, productScope: campaign.productScope, marketingText: campaign.marketingText,
           endsAt: campaign.endsAt || null });
@@ -463,6 +493,43 @@ export class PromotionService {
       }
       return offers;
     } finally { client.release(); }
+  }
+
+  public async shoppingIncentives(client: PoolClient, customerUserId: string | null, cart: CartFact[], appliedCode: string | null) {
+    const allCampaigns = await this.loadCampaigns(client);
+    const campaigns = allCampaigns.filter(row => row.automatic && row.smartBar.enabled && this.campaignActive(row));
+    if (!campaigns.length) return [];
+    const facts = customerUserId ? await this.customerFacts(client, customerUserId) : null;
+    const applied = allCampaigns.find(row => row.code === appliedCode);
+    const incentives = [];
+    for (const campaign of campaigns) {
+      if (facts ? !this.audienceEligible(campaign, facts) || !evaluateRule(campaign.customerRules, facts)
+        : campaign.audience !== "all" || Boolean(campaign.customerRules)) continue;
+      if (!await this.campaignUsageAllowed(client, campaign, customerUserId)) continue;
+      if (applied && applied.id !== campaign.id) continue;
+      const allowed = new Set(campaign.productScope.values.map(value => value.toLowerCase()));
+      const lines = cart.filter(line => !line.isSet && line.modelDiscountPercent <= 0 &&
+        (campaign.productScope.mode === "all" || allowed.has(String(campaign.productScope.mode === "categories" ? line.category
+          : campaign.productScope.mode === "models" ? line.modelId : line.itemCode).toLowerCase())));
+      const current = campaign.distinctModels ? new Set(lines.map(line => line.modelId)).size : lines.length;
+      const remaining = Math.max(0, campaign.minQuantity - current);
+      if (remaining > campaign.smartBar.showWithin || !lines.length) continue;
+      const missingMinor = Math.max(0, campaign.minOrderMinor - lines.reduce((sum, line) => sum + line.sellingMinor, 0));
+      const achieved = !remaining && !missingMinor && campaign.code === appliedCode;
+      if (!remaining && !missingMinor && !achieved) continue;
+      const reward = campaign.discountKind === "freeShipping" ? "توصيل مجاني" : campaign.discountKind === "gift"
+        ? `${campaign.giftQuantity === 1 ? "قطعة هدية" : `${campaign.giftQuantity} قطع هدية`} من الأقل سعرًا`
+        : `خصم ${campaign.discountKind === "fixed" ? `${campaign.discountAmountMinor / 100} جنيه` : `${campaign.discountPercent}٪`}`;
+      const countLabel = campaign.distinctModels ? "موديل مختلف" : "قطعة";
+      let message = achieved ? `استفدت بالعرض: ${reward}. كمّل طلبك للاستفادة.`
+        : remaining ? `فاضلك ${remaining} ${countLabel} وتستفيد بـ${reward}.` : `اكتمل العدد المطلوب لـ${reward}.`;
+      if (!achieved && campaign.smartBar.message) message = campaign.smartBar.message
+        .replaceAll("{remaining}", String(remaining)).replaceAll("{target}", String(campaign.minQuantity)).replaceAll("{reward}", reward);
+      if (missingMinor) message += ` متبقي ${missingMinor / 100} جنيه من قيمة القطع المشمولة.`;
+      incentives.push({ id: campaign.id, type: campaign.discountKind, title: campaign.marketingText || "كمّل اختياراتك واستفيد", message,
+        current, target: campaign.minQuantity, remaining, achieved, priority: campaign.priority });
+    }
+    return incentives.sort((a, b) => Number(b.achieved) - Number(a.achieved) || b.priority - a.priority || a.remaining - b.remaining || a.id.localeCompare(b.id)).slice(0, 1);
   }
 
   public async list(): Promise<Record<string, unknown>[]> {

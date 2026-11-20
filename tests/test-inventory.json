@@ -2,6 +2,8 @@
   "version": 1,
   "policy": "Every root tests/*.js, *.cjs or *.py file must be either wired into Frontend CI or explicitly classified as legacy with a rewrite/retire reason.",
   "ciStatic": [
+    "scroll-header-runtime.cjs",
+    "shopping-bar-runtime.cjs",
     "release-ci-gate.cjs",
     "birthday-welcome-runtime.cjs",
     "return-wizard-contract.cjs",
@@ -69,6 +71,7 @@
     "settings-accordion-contract.cjs"
   ],
   "ciBrowser": [
+    "shopping-feedback-browser.cjs",
     "brand-details-browser.cjs",
     "checkout-address-browser.cjs",
     "coming-soon-browser.cjs",

@@ -1080,6 +1080,16 @@ paths:
         "200": { description: Customer eligible quantity offers }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /me/promotions/card-progress:
+    get:
+      tags: [Promotions]
+      operationId: getOwnCardPurchaseGoalProgress
+      security: [{ sessionCookie: [] }]
+      description: No-store authenticated customer progress for the optional one-time paid-delivered-piece card goal. Caller-supplied customer IDs are ignored. Paused goals, distant customers and existing card holders receive no incentive. This does not guarantee a monthly-draw win.
+      responses:
+        "200": { description: Safe incentives array containing only this customer progress, or an empty array }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /me/promotions/validate-v2:
     get:
       tags: [Promotions]
@@ -1531,7 +1541,15 @@ components:
         code: { type: string, minLength: 2, maxLength: 60, pattern: "^[A-Za-z0-9_-]+$" }
         status: { type: string, enum: [Draft, Scheduled, Active, Paused, Expired], default: Draft }
         discountPercent: { type: number, minimum: 0, maximum: 100, description: Positive for percentage campaigns; zero for fixed quantity savings }
-        discountKind: { type: string, enum: [percent, fixed], default: percent }
+        discountKind: { type: string, enum: [percent, fixed, freeShipping, gift], default: percent }
+        giftQuantity: { type: integer, minimum: 1, maximum: 20, default: 1, description: Cheapest eligible reserved pieces gifted once per order; must be less than minQuantity }
+        smartBar:
+          type: object
+          additionalProperties: false
+          properties:
+            enabled: { type: boolean, default: false }
+            showWithin: { type: integer, minimum: 0, maximum: 100, default: 4 }
+            message: { type: string, maxLength: 240, default: "", description: "Optional remaining/target/reward placeholders in braces" }
         discountAmountMinor: { type: integer, minimum: 0, maximum: 1000000000, default: 0 }
         distinctModels: { type: boolean, default: false, description: Requires automatic=true and minQuantity at least 2; only different undiscounted non-Set models count }
         marketingText: { type: string, maxLength: 240, default: "" }

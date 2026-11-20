@@ -1382,51 +1382,7 @@ function renderFilterButtons() {
     window.dispatchEvent(new CustomEvent('dart:product-filters-rendered'));
 }
 function showCartBanner(productTitle) {
-    let banner = document.getElementById('cartBanner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'cartBanner';
-        banner.className = 'cart-banner';
-        document.body.appendChild(banner);
-    }
-    const message = document.createElement('span');
-    message.style.fontSize = '13px';
-    message.textContent = `تم إضافة "${String(productTitle || '')}" للسلة`;
-    const actions = document.createElement('div');
-    actions.style.display = 'flex';
-    actions.style.gap = '10px';
-    actions.style.alignItems = 'center';
-    const cartLink = document.createElement('a');
-    cartLink.href = '#cartView';
-    cartLink.id = 'bannerGoToCart';
-    cartLink.textContent = 'السلة';
-    Object.assign(cartLink.style, {
-        color: '#fff',
-        background: '#000',
-        padding: '5px 10px',
-        borderRadius: '4px',
-        textDecoration: 'none',
-        fontSize: '12px'
-    });
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'إغلاق إشعار السلة');
-    close.textContent = '×';
-    Object.assign(close.style, {
-        cursor: 'pointer',
-        fontSize: '16px',
-        fontWeight: 'bold',
-        border: '0',
-        background: 'transparent'
-    });
-    close.addEventListener('click', () => banner.classList.remove('show'));
-    actions.append(cartLink, close);
-    banner.replaceChildren(message, actions);
-    banner.classList.add('show');
-    clearTimeout(window.cartBannerTimeout);
-    window.cartBannerTimeout = setTimeout(() => {
-        banner.classList.remove('show');
-    }, 2500);
+  void window.DartShoppingBarReady?.(productTitle).catch(() => showToast("تمت الإضافة إلى السلة"));
 }
 document.addEventListener('DOMContentLoaded', async () => {
     initCartAndCheckoutEvents();

@@ -239,7 +239,6 @@
         if (typeof renderCart === "function") renderCart();
         return false;
       }
-      toast("تم إضافة المنتج إلى السلة بنجاح!");
       if (typeof showCartBanner === "function") showCartBanner(item.title);
       root.DartStorefront?.close?.();
       if (typeof renderCart === "function") renderCart();

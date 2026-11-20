@@ -5,8 +5,9 @@ import { thirdPartyDetails, type ThirdPartyInput } from "./third-party-payment.j
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { releaseAdminCartItem } from "./commerce.cart-release.js";
-import { allocateFixedSaving, quantityReturnRefund } from "../promotions/quantity-offer.js";
+import { allocateFixedSaving, allocateGiftSaving, quantityReturnRefund } from "../promotions/quantity-offer.js";
 import { PromotionService } from "../promotions/promotion.service.js";
+import { awardPurchaseGoalCard, cardGoalProgress } from "../loyalty/card-purchase-goal.js";
 import { activeManualDiscount, allocateManualDiscount, consumeManualDiscount } from "../promotions/customer-manual-discount.js";
 import { allocateCodeDiscount, codeAllowsLine, DiscountCodeService } from "../promotions/discount-code.js";
 import { AppError } from "../../http/app-error.js";
@@ -1669,7 +1670,7 @@ export class CommerceService {
         if (
           !codePromotion ||
           !promotionDateActive(codePromotion) ||
-          (!promotionPercentage(codePromotion) && codePromotion.discountKind !== "fixed")
+          (!promotionPercentage(codePromotion) && !["fixed", "gift", "freeShipping"].includes(String(codePromotion.discountKind)))
         ) {
           throw new AppError(
             409,
@@ -1692,9 +1693,11 @@ export class CommerceService {
           type: "Promotion",
           code: normalizedCode,
           percent: promotionPercent,
-          ...(codePromotion.distinctModels ? { quantityOffer: {
+          rewardKind: String(codePromotion.discountKind || "percent"),
+          ...(codePromotion.distinctModels || ["gift", "freeShipping"].includes(String(codePromotion.discountKind)) ? { quantityOffer: {
             minQuantity: Number(codePromotion.minQuantity), minOrderMinor: Number(codePromotion.minOrderMinor || 0),
             discountKind: codePromotion.discountKind || "percent", discountAmountMinor: Number(codePromotion.discountAmountMinor || 0),
+            distinctModels: Boolean(codePromotion.distinctModels), giftQuantity: Number(codePromotion.giftQuantity || 1),
             eligibleItemCodes: items.filter((row) => !setPrices.has(row.id) && Number(row.discount_percent || 0) <= 0 && campaignAppliesToItem(codePromotion, row)).map((row) => row.item_code),
           } } : {}),
         };
@@ -1780,12 +1783,16 @@ export class CommerceService {
       if ((hasSetBirthday && !birthdayBenefit) || [...setCardCodes].some((code) => code !== cardBenefit?.cardId)) {
         throw new AppError(409, "SET_BENEFIT_CHANGED", "Set reward eligibility changed. Refresh the cart and add the Set again.");
       }
-      const campaignFixed = campaign?.discountKind === "fixed" ? allocateFixedSaving(items.filter((row) => !setPrices.has(row.id)
+      const campaignLines = items.filter((row) => campaign && !setPrices.has(row.id)
         && Number(row.discount_percent || 0) <= 0 && campaignAppliesToItem(campaign!, row))
-        .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })), Number(campaign.discountAmountMinor)) : new Map<string, number>();
+        .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) }));
+      const campaignFixed = campaign?.discountKind === "fixed" ? allocateFixedSaving(campaignLines, Number(campaign.discountAmountMinor))
+        : campaign?.discountKind === "gift" ? allocateGiftSaving(campaignLines, Number(campaign.giftQuantity || 1))
+        : new Map<string, number>();
+      const priceCampaign = campaign?.discountKind !== "freeShipping" ? campaign : null;
       const manualGrant = !guest && customerUserId ? await activeManualDiscount(client, customerUserId) : null;
       const manualAllocations = allocateManualDiscount(manualGrant, items.filter((row) => !setPrices.has(row.id)
-        && Number(row.discount_percent || 0) <= 0 && !(promotion && campaign && campaignAppliesToItem(campaign, row)))
+        && Number(row.discount_percent || 0) <= 0 && !(promotion && priceCampaign && campaignAppliesToItem(priceCampaign, row)))
         .map((row) => ({ id: row.id, baseMinor: Number(row.selling_minor) })));
       const manualBenefit: Record<string, unknown> | null = manualGrant && manualAllocations.size
         ? { type: "Manual", id: manualGrant.id, name: manualGrant.name, kind: manualGrant.kind,
@@ -1793,7 +1800,7 @@ export class CommerceService {
       const discountCode = resolvedCampaign.discountCode;
       const codeLines = discountCode ? items.filter(row =>
         !setPrices.has(row.id) && Number(row.discount_percent || 0) <= 0 &&
-        !(campaign && promotion && campaignAppliesToItem(campaign,row)) &&
+        !(priceCampaign && promotion && campaignAppliesToItem(priceCampaign,row)) &&
         !manualAllocations.has(row.id) &&
         codeAllowsLine(discountCode,{
           id: row.id,itemCode: row.item_code,modelId: row.model_id,category: row.category || "",
@@ -1825,7 +1832,7 @@ export class CommerceService {
           source: "Discount Code", reference: discountCode!.code, consumesDartCardSlot: false }
           : setPrice ? { percent: Number(setPrice.discount_percent), source: setPrice.discount_source, reference: setPrice.discount_reference || "", consumesDartCardSlot: false } : resolveItemDiscount(
           modelDiscountPercent,
-          promotion && campaign && campaignAppliesToItem(campaign, row) ? promotion : birthdayBenefit || cardBenefit,
+          promotion && priceCampaign && campaignAppliesToItem(priceCampaign, row) ? promotion : birthdayBenefit || cardBenefit,
           cardRemainingItems - cardAppliedItems,
         );
         const effectiveDiscountPercent = resolvedDiscount.percent;
@@ -1853,19 +1860,23 @@ export class CommerceService {
         .reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
       const usedBenefits = [promotion, manualBenefit, codeBenefit, birthdayBenefit, cardBenefit].filter((benefit): benefit is Record<string, unknown> => {
         if (!benefit) return false;
+        if (benefit.type === "Promotion" && campaign?.discountKind === "freeShipping") {
+          benefit.percent = 0; benefit.discountMinor = shippingFeeMinor(settings); return true;
+        }
         const source = benefit.type === "Promotion" ? "Campaign" : String(benefit.type);
         const lines = itemSnapshots.filter((snapshot) => snapshot.discountSource === source);
         if (!lines.length) return false;
         const rates = new Set(lines.map((line) => line.effectiveDiscountPercent));
         benefit.percent = rates.size === 1 ? lines[0]!.effectiveDiscountPercent : 0;
-        benefit.discountMinor = lines.reduce((sum, snapshot) => sum + snapshot.discountMinor, 0);
+        benefit.discountMinor = lines.reduce((sum, snapshot) => sum + snapshot.discountMinor, 0)
+          + (benefit.type === "Promotion" && campaign?.discountKind === "freeShipping" ? shippingFeeMinor(settings) : 0);
         return true;
       });
       promotion = usedBenefits.length > 1
         ? { type: "Mixed", percent: 0, discountMinor: benefitDiscountMinor, benefits: usedBenefits }
         : usedBenefits[0] || null;
       promotionPercent = Number(promotion?.percent || 0);
-      const shippingMinor = shippingFeeMinor(settings);
+      const shippingMinor = campaign?.discountKind === "freeShipping" && usedBenefits.some(benefit => benefit.type === "Promotion") ? 0 : shippingFeeMinor(settings);
       const fingerprint = createHash("sha256").update(JSON.stringify({ customerUserId: guest ? null : customerUserId, reservationId, shippingMinor,
         lines: itemSnapshots.map((line) => [line.row.item_code,line.sellingMinor,line.finalUnitMinor,line.discountSource,line.discountReference]),
       })).digest("hex");
@@ -1877,6 +1888,8 @@ export class CommerceService {
   private cartQuoteView(pricing: Awaited<ReturnType<CommerceService["checkoutPricing"]>>) {
     return { currency: "EGP", subtotalMinor: pricing.subtotalMinor, discountMinor: pricing.orderDiscountMinor,
       shippingMinor: pricing.shippingMinor, totalMinor: pricing.finalMinor, fingerprint: pricing.fingerprint,
+      shippingOfferCode: orderBenefit(pricing.promotion, "Promotion")?.rewardKind === "freeShipping"
+        ? String(orderBenefit(pricing.promotion, "Promotion")?.code || "") : null,
       lines: pricing.itemSnapshots.map((line) => ({ itemCode: line.row.item_code, modelId: line.row.model_id,
         color: line.row.color, size: line.row.size, isSet: pricing.setItemIds.has(line.row.id), baseMinor: line.sellingMinor, finalMinor: line.finalUnitMinor,
         discountSource: line.discountSource, discountPercent: line.effectiveDiscountPercent, discountReference: line.discountReference })),
@@ -1902,8 +1915,14 @@ export class CommerceService {
       const items = await this.checkoutInventory(client, reservationId);
       const settings = await client.query<{ data: Record<string, unknown> }>("SELECT data FROM site_settings WHERE id='main' FOR SHARE");
       const pricing = await this.checkoutPricing(client, customerUserId, reservationId, items.rows, settings.rows[0]?.data || {}, promotionCode, !customerUserId);
+      const incentives = await new PromotionService(this.pool).shoppingIncentives(client, customerUserId,
+        items.rows.map(row => ({ itemCode: row.item_code, modelId: row.model_id, category: row.category || "", sellingMinor: Number(row.selling_minor),
+          modelDiscountPercent: Number(row.discount_percent || 0), isSet: pricing.setItemIds.has(row.id) })),
+        String(orderBenefit(pricing.promotion, "Promotion")?.code || "") || null);
+      const cardIncentives = incentives.length ? [] : await cardGoalProgress(client, customerUserId, settings.rows[0]?.data || {},
+        pricing.itemSnapshots.filter(line => line.finalUnitMinor > 0).length);
       await client.query("COMMIT");
-      return this.cartQuoteView(pricing);
+      return { ...this.cartQuoteView(pricing), incentives: incentives.length ? incentives : cardIncentives };
     } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
     finally { client.release(); }
   }
@@ -6958,6 +6977,7 @@ export class CommerceService {
     await this.syncSetDartCardOrderStatus(
       client,orderId,orderCode,previousStatus,nextStatus,promotion,
     );
+    if (nextStatus === "Delivered") await awardPurchaseGoalCard(client, orderId);
 
     await client.query(
       `INSERT INTO order_events (

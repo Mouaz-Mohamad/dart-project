@@ -35,6 +35,7 @@
     birthdayDiscountPercent: 30,
     dartCardDiscountPercent: 40,
     dartCardEnabled: false,
+    shoppingBar: { enabled: true, durationSeconds: 6, cardGoal: { enabled: false, targetPieces: 10, showWithin: 4, message: "" } },
     refundCustomerFee: 100,
     repeatExchangeCustomerFee: 50,
     exchangePeriodDays: 14,
@@ -119,6 +120,7 @@
       announcements: Array.isArray(value.announcements) ? value.announcements : [],
       modelCards: value.modelCards && typeof value.modelCards === "object" ? value.modelCards : {},
       storefrontProducts: {...defaults.storefrontProducts, ...(value.storefrontProducts && typeof value.storefrontProducts === "object" ? value.storefrontProducts : {})},
+      shoppingBar: { ...defaults.shoppingBar, ...(value.shoppingBar || {}), cardGoal: { ...defaults.shoppingBar.cardGoal, ...(value.shoppingBar?.cardGoal || {}) } },
     };
   }
 

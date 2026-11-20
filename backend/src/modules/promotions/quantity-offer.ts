@@ -4,8 +4,17 @@ import type { PoolClient } from "pg";
 export type OfferLine = { itemCode: string; modelId: string; baseMinor: number; finalMinor: number };
 export type QuantityOfferSnapshot = {
   minQuantity: number; minOrderMinor: number; eligibleItemCodes: string[];
-  discountKind: "percent" | "fixed"; discountAmountMinor: number;
+  discountKind: "percent" | "fixed" | "gift" | "freeShipping"; discountAmountMinor: number;
+  distinctModels?: boolean; giftQuantity?: number;
 };
+
+// Gift pieces must already be selected and reserved by the customer. The offer
+// discounts the cheapest eligible pieces once; it never inserts arbitrary stock.
+export function allocateGiftSaving(lines: Array<{ id: string; baseMinor: number }>, quantity: number): Map<string, number> {
+  const gifted = new Set([...lines].sort((a, b) => a.baseMinor - b.baseMinor || a.id.localeCompare(b.id))
+    .slice(0, Math.max(0, Math.trunc(quantity))).map(line => line.id));
+  return new Map(lines.map(line => [line.id, gifted.has(line.id) ? line.baseMinor : 0]));
+}
 
 // Allocate a fixed order saving exactly once, using integer piastres and a stable
 // largest-remainder split. No line can become negative and no rounding is lost.
@@ -31,8 +40,11 @@ export function quantityRefund(
   const kept = lines.filter((line) => !returnedCodes.has(line.itemCode));
   const keptEligible = kept.filter((line) => eligible.has(line.itemCode));
   const subtotal = keptEligible.reduce((sum, line) => sum + line.baseMinor, 0);
-  const qualifies = new Set(keptEligible.map((line) => line.modelId)).size >= policy.minQuantity && subtotal >= policy.minOrderMinor;
+  const quantity = policy.distinctModels === false ? keptEligible.length : new Set(keptEligible.map((line) => line.modelId)).size;
+  const qualifies = quantity >= policy.minQuantity && subtotal >= policy.minOrderMinor;
   const saving = !qualifies ? 0 : policy.discountKind === "fixed" ? Math.min(subtotal, policy.discountAmountMinor)
+    : policy.discountKind === "freeShipping" ? 0 : policy.discountKind === "gift"
+      ? [...allocateGiftSaving(keptEligible.map(line => ({ id: line.itemCode, baseMinor: line.baseMinor })), policy.giftQuantity || 1).values()].reduce((sum, minor) => sum + minor, 0)
     : keptEligible.reduce((sum, line) => sum + line.baseMinor - line.finalMinor, 0);
   const retainedMinor = kept.filter((line) => !eligible.has(line.itemCode)).reduce((sum, line) => sum + line.finalMinor, 0) + subtotal - saving;
   const targetRefundMinor = Math.max(0, paidMinor - retainedMinor);
@@ -50,6 +62,8 @@ export async function quantityReturnRefund(
   const benefit = benefits.find((row: Record<string, unknown>) => row.type === "Promotion" && row.quantityOffer);
   if (!benefit) return null;
   const savedPolicy = benefit.quantityOffer as QuantityOfferSnapshot;
+  // Shipping already earned at delivery adds no per-piece charge on return;
+  // non-Campaign item prices below retain their own immutable discounts.
   const lines = await client.query<{ item_code: string; model_id: string; original_unit_minor: string; final_unit_minor: string; discount_source: string; discount_reference: string | null }>(
     "SELECT item_code,model_id,original_unit_minor::text,final_unit_minor::text,discount_source,discount_reference FROM order_items WHERE order_id=$1", [orderId]);
   // Exchanges replace physical codes while retaining the same priced order line.

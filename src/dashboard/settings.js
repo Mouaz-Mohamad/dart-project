@@ -424,6 +424,15 @@
     $("settings-promotion-min-quantity").value = "1";
     $("save-promotion").textContent = "Create campaign";
     $("cancel-promotion-edit").hidden = true;
+    syncPromotionRewardForm();
+  }
+
+  function syncPromotionRewardForm() {
+    const kind = $("settings-promotion-kind")?.value || "percent";
+    const gift = $("settings-promotion-gift-quantity");
+    if (gift) gift.closest("label").hidden = kind !== "gift";
+    $("settings-promotion-percent")?.closest("label")?.toggleAttribute("hidden", kind !== "percent");
+    $("settings-promotion-amount")?.closest("label")?.toggleAttribute("hidden", kind !== "fixed");
   }
 
   function campaignPayloadFromForm() {
@@ -435,10 +444,13 @@
       name: $("settings-promotion-name").value.trim(),
       code: $("settings-promotion-code").value.trim().toUpperCase(),
       status: $("settings-promotion-status").value,
-      discountPercent: $("settings-promotion-kind").value === "fixed" ? 0 : number("settings-promotion-percent", 0),
+      discountPercent: $("settings-promotion-kind").value === "percent" ? number("settings-promotion-percent", 0) : 0,
       discountKind: $("settings-promotion-kind").value,
       discountAmountMinor: Math.round(Math.max(0, number("settings-promotion-amount", 0)) * 100),
       distinctModels: $("settings-promotion-distinct").checked,
+      giftQuantity: number("settings-promotion-gift-quantity", 1),
+      smartBar: { enabled: $("settings-promotion-bar-enabled")?.checked === true,
+        showWithin: number("settings-promotion-bar-within", 4), message: $("settings-promotion-bar-message")?.value.trim() || "" },
       marketingText: $("settings-promotion-message").value.trim(),
       ...($("settings-promotion-start").value ? { startsAt: $("settings-promotion-start").value } : {}),
       ...($("settings-promotion-end").value ? { endsAt: $("settings-promotion-end").value } : {}),
@@ -477,7 +489,9 @@
       row.dataset.promotionId = campaign.id;
       const copy = document.createElement("div");
       const title = document.createElement("strong");
-      title.textContent = `${campaign.name} · ${campaign.discountKind === "fixed" ? `${Number(campaign.discountAmountMinor) / 100} EGP` : `${campaign.discountPercent}%`}${campaign.distinctModels ? ` · ${campaign.minQuantity} different models` : ""}`;
+      const reward = campaign.discountKind === "freeShipping" ? "Free shipping" : campaign.discountKind === "gift" ? `${campaign.giftQuantity || 1} gift pieces`
+        : campaign.discountKind === "fixed" ? `${Number(campaign.discountAmountMinor) / 100} EGP` : `${campaign.discountPercent}%`;
+      title.textContent = `${campaign.name} · ${reward} · minimum ${campaign.minQuantity}${campaign.distinctModels ? " different models" : " pieces"}`;
       const details = document.createElement("small");
       const basis = campaign.limitBasis === "customers" ? "customers" : "orders";
       const limit = Number(campaign.totalUsageLimit || 0);
@@ -610,6 +624,18 @@
       $("settings-promotion-automatic").checked = true;
     }
   });
+  $("settings-promotion-kind")?.addEventListener("change", () => {
+    const kind = $("settings-promotion-kind").value;
+    if (["gift", "freeShipping", "fixed"].includes(kind)) {
+      $("settings-promotion-automatic").checked = true;
+      $("settings-promotion-min-quantity").value = Math.max(kind === "gift" ? 3 : 2, Number($("settings-promotion-min-quantity").value) || 1);
+      $("settings-promotion-distinct").checked = true;
+    }
+    syncPromotionRewardForm();
+  });
+  $("settings-promotion-bar-enabled")?.addEventListener("change", () => {
+    if ($("settings-promotion-bar-enabled").checked) $("settings-promotion-automatic").checked = true;
+  });
 
   $("cancel-promotion-edit")?.addEventListener("click", resetPromotionForm);
   $("settings-promotions-list")?.addEventListener("click", (event) => {
@@ -623,6 +649,11 @@
     $("settings-promotion-code").value = campaign.code;
     $("settings-promotion-percent").value = campaign.discountPercent;
     $("settings-promotion-kind").value = campaign.discountKind || "percent";
+    $("settings-promotion-gift-quantity").value = campaign.giftQuantity || 1;
+    $("settings-promotion-bar-enabled").checked = campaign.smartBar?.enabled === true;
+    $("settings-promotion-bar-within").value = campaign.smartBar?.showWithin ?? 4;
+    $("settings-promotion-bar-message").value = campaign.smartBar?.message || "";
+    syncPromotionRewardForm();
     $("settings-promotion-amount").value = Number(campaign.discountAmountMinor || 0) / 100;
     $("settings-promotion-distinct").checked = Boolean(campaign.distinctModels);
     $("settings-promotion-message").value = campaign.marketingText || "";
@@ -755,6 +786,15 @@
   function renderSettings(settings = root.DartSiteSettings.get()) {
     const drafts=[...document.querySelectorAll('#settings form[data-dirty="true"] input,#settings form[data-dirty="true"] select,#settings form[data-dirty="true"] textarea')].map(node=>({node,value:node.value,checked:node.checked}));
     fillGeneral(settings);
+    const bar = settings.shoppingBar || {};
+    if ($("settings-shopping-bar-form")) {
+      $("settings-shopping-bar-enabled").checked = bar.enabled !== false;
+      $("settings-shopping-bar-duration").value = bar.durationSeconds || 6;
+      $("settings-card-goal-enabled").checked = bar.cardGoal?.enabled === true;
+      $("settings-card-goal-target").value = bar.cardGoal?.targetPieces || 10;
+      $("settings-card-goal-within").value = bar.cardGoal?.showWithin ?? 4;
+      $("settings-card-goal-message").value = bar.cardGoal?.message || "";
+    }
     if($('settings-media-form')?.dataset.dirty!=='true')renderMedia(settings);
     renderAnnouncements(settings);
     if($('settings-typing-form')?.dataset.dirty!=='true')renderTyping(settings);
@@ -763,6 +803,7 @@
   }
 
   async function init() {
+    syncPromotionRewardForm();
     let settings = root.DartSiteSettings.get();
     try {
       settings = await root.DartSiteSettings.hydrate?.(true) || settings;
@@ -780,6 +821,15 @@
     void init();
   });
   root.addEventListener("dart:admin-authenticated", () => { void loadPromotions(); });
+  $("settings-shopping-bar-form")?.addEventListener("submit", event => {
+    event.preventDefault();
+    const next = root.DartSiteSettings.get();
+    next.shoppingBar = { enabled: $("settings-shopping-bar-enabled").checked,
+      durationSeconds: number("settings-shopping-bar-duration", 6),
+      cardGoal: { enabled: $("settings-card-goal-enabled").checked, targetPieces: number("settings-card-goal-target", 10),
+        showWithin: number("settings-card-goal-within", 4), message: $("settings-card-goal-message").value.trim() } };
+    void saveSettings(next, "Shopping bar settings updated");
+  });
   root.addEventListener("dart:site-settings-changed", (event) => {
     renderSettings(event.detail || root.DartSiteSettings.get());
   });

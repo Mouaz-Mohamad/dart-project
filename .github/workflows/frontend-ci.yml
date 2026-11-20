@@ -90,6 +90,8 @@ jobs:
       - name: Frontend regression contracts
         run: |
           node scripts/check-source-layout.cjs
+          node tests/scroll-header-runtime.cjs
+          node tests/shopping-bar-runtime.cjs
           node tests/storefront-products-settings.cjs
           node tests/return-wizard-contract.cjs
           node tests/source-layout-contract.cjs

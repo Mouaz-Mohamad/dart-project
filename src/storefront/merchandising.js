@@ -22,15 +22,18 @@
   }
   function offerMessage(offer) {
     const lines = offerCartFacts(offer);
-    const missing = Math.max(0, Number(offer.minQuantity) - new Set(lines.map((line) => line.modelId)).size);
+    const distinct = offer.distinctModels !== false;
+    const missing = Math.max(0, Number(offer.minQuantity) - (distinct ? new Set(lines.map((line) => line.modelId)).size : lines.length));
     const missingMinor = Math.max(0, Number(offer.minOrderMinor || 0) - lines.reduce((sum, line) => sum + Number(line.baseMinor || 0), 0));
-    const saving = offer.discountKind === "fixed" ? `${Number(offer.discountAmountMinor) / 100} جنيه` : `${offer.discountPercent}٪`;
+    const saving = offer.discountKind === "freeShipping" ? "توصيل مجاني" : offer.discountKind === "gift" ? `${offer.giftQuantity || 1} قطعة هدية من الأقل سعرًا`
+      : `خصم ${offer.discountKind === "fixed" ? `${Number(offer.discountAmountMinor) / 100} جنيه` : `${offer.discountPercent}٪`}`;
     const quote = window.DartPlatform?.currentCartQuote?.();
     const applied = (quote?.lines || []).filter((line) => line.discountSource === "Campaign" && line.discountReference === offer.code);
     const saved = applied.reduce((sum, line) => sum + Number(line.baseMinor) - Number(line.finalMinor), 0);
-    let message = `اشتري من ${offer.minQuantity} موديلات مختلفة وخد خصم ${saving}.`;
-    if (saved > 0) message = `استفدت بالعرض! وفّرت ${saved / 100} جنيه.`;
-    else if (lines.length && missing) message += ` فاضلك ${missing} موديل مختلف.`;
+    let message = `اختار ${offer.minQuantity} ${distinct ? "موديلات مختلفة" : "قطع"} وخد ${saving}.`;
+    if (offer.discountKind === "freeShipping" && quote?.shippingOfferCode === offer.code && quote.shippingMinor === 0) message = "استفدت بالعرض! التوصيل مجاني على طلبك.";
+    else if (saved > 0) message = `استفدت بالعرض! وفّرت ${saved / 100} جنيه.`;
+    else if (lines.length && missing) message += ` فاضلك ${missing} ${distinct ? "موديل مختلف" : "قطعة"}.`;
     else if (lines.length && !missing && !missingMinor) message += " اكتمل العدد؛ يتأكد الخصم عند مراجعة الطلب.";
     if (missingMinor) message += ` الحد الأدنى لقيمة القطع المشمولة ${Number(offer.minOrderMinor) / 100} جنيه.`;
     return message;

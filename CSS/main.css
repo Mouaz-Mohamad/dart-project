@@ -178,7 +178,55 @@ header {
 
 #header-container {
   min-height: 90px;
+  position: sticky;
+  top: 0;
+  z-index: 200000;
+  transition: transform 180ms ease;
 }
+
+#header-container.dart-nav-hidden {
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+/* Keep horizontal clipping without creating an ancestor scroll container. */
+body.dart-scroll-header { overflow-x: clip; }
+
+.menu-open #header-container {
+  transform: none;
+  transition: none;
+}
+
+/* Shopping confirmation and personalized, server-validated offer progress. */
+.cart-banner {
+  position: fixed;
+  inset-inline: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  width: min(680px, calc(100% - 24px));
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d797a7;
+  border-radius: 16px;
+  background: #850322;
+  color: #fffaf4;
+  box-shadow: 0 8px 32px #310b2638;
+  z-index: 400000;
+  font-family: var(--font-main);
+}
+.cart-banner[hidden], .cart-banner [hidden] { display: none; }
+.cart-banner-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 20px; padding: 16px; color: inherit; text-decoration: none; }
+.cart-banner-copy { flex: 1; min-width: 0; display: grid; gap: 10px; overflow-wrap: anywhere; }
+.cart-banner-copy strong { display: block; color: inherit; font-size: 15px; line-height: 1.7; }
+.cart-banner-detail { display: block; font-size: 13px; line-height: 1.7; color: #f9e3e4; }
+.cart-banner-action { flex-shrink: 0; border-radius: 9px; padding: 9px 12px; background: #fffaf4; color: #850322; font-size: 13px; font-weight: 700; }
+.cart-banner-close { border: 0; color: inherit; background: transparent; cursor: pointer; align-self: flex-start; width: 44px; height: 44px; font-size: 26px; border-radius: 12px; }
+.cart-banner-link:focus-visible, .cart-banner-close:focus-visible { outline: 3px solid #f2c884; outline-offset: -4px; }
+.cart-banner-progress { appearance: none; border: 0; border-radius: 8px; height: 5px; width: 100%; background: #ffffff38; color: #f2c884; }
+.cart-banner-progress::-webkit-progress-bar { background: #ffffff38; border-radius: 8px; }
+.cart-banner-progress::-webkit-progress-value { background: #f2c884; border-radius: 8px; }
+.cart-banner-progress::-moz-progress-bar { background: #f2c884; border-radius: 8px; }
 
 .top {
   padding: 10px 0 0 10px;

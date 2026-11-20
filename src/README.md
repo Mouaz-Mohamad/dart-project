@@ -29,6 +29,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `storefront/address.js` | Delivery pin verification, address state and lookup concurrency | `Js/dart-address.js` |
 | `storefront/profile-records.js` | Profile order, return and waiting summaries | `Js/dart-profile-records.js` |
 | `storefront/home-ui.js` | Curated Home UI | `Js/dart-ui.home.min.js` |
+| `storefront/shopping-bar.js` | Deferred scroll-aware header, cart feedback and server-validated incentive progress | `Js/dart-shopping-bar.js` |
 
 `runtime-layout.json` is the ordered source list for the two large readable runtimes.
 Its source units contain complete statements. They intentionally share the existing

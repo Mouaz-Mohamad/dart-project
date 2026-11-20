@@ -11,6 +11,10 @@
    ========================================================================== */
 
 /* BEGIN Tablet / narrow desktop */
+@media (prefers-reduced-motion: reduce) {
+  #header-container { transition: none; }
+}
+
 @media (max-width: 370px) {
   .address-form .dart-birthday-selects { gap: 5px; }
   .address-form .dart-birthday-selects select { padding: 9px 18px 9px 7px; font-size: 11px; }
@@ -74,6 +78,10 @@
 
 /* BEGIN Mobile storefront and representative layout */
 @media (max-width: 700px) {
+  .cart-banner-link { align-items: flex-start; flex-direction: column; gap: 9px; padding: 12px; }
+  .cart-banner-copy { width: 100%; }
+  .cart-banner-copy strong { font-size: 14px; }
+  .cart-banner-action { padding: 7px 12px; }
   /* Match news ticker, cart button and menu offset to the compact header. */
   .under-nav,
   .dart-nav-ticker,

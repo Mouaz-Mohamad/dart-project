@@ -5,6 +5,8 @@ import { CatalogService } from "../src/modules/catalog/catalog.service.js";
 import { PromotionService, promotionCampaignInputSchema } from "../src/modules/promotions/promotion.service.js";
 import { allocateFixedSaving, quantityRefund } from "../src/modules/promotions/quantity-offer.js";
 import { embeddedStore } from "./embedded-store.js";
+import { cardGoalProgress, awardPurchaseGoalCard } from "../src/modules/loyalty/card-purchase-goal.js";
+import { cairoDateKey } from "../src/modules/commerce/commerce.rewards.js";
 
 describe("quantity offers on the production schema", () => {
   let store: Awaited<ReturnType<typeof embeddedStore>>, commerce: CommerceService, promotions: PromotionService, catalog: CatalogService;
@@ -33,7 +35,7 @@ describe("quantity offers on the production schema", () => {
       }
     }
     const campaign = await promotions.create(promotionCampaignInputSchema.parse({ name: "Quantity synthetic", code: `Q-${suffix}`,
-      status: "Active", discountPercent: kind === "fixed" ? 0 : 10, discountKind: kind, discountAmountMinor: kind === "fixed" ? 30001 : 0,
+      status: "Active", discountPercent: kind === "percent" ? 10 : 0, discountKind: kind, discountAmountMinor: kind === "fixed" ? 30001 : 0,
       distinctModels: true, automatic: true, minQuantity: min, perCustomerUsageLimit: 1, marketingText: "كمّل اللوك",
       productScope: { mode: "models", values: models } }), actor, "quantity-test");
     const reservation = `CART-QUANTITY-${suffix}`;
@@ -94,6 +96,85 @@ describe("quantity offers on the production schema", () => {
     expect(first.refundAmount).toBe(1000);
     const second = await commerce.adminManualReturn(actor, { itemCode: f.pieces[1]![0]!, condition: "Good", reason: "Test", refundAmount: 0 }, "fixed-return");
     expect(second.refundAmount).toBe(699.99);
+  });
+  it("shows a shipping incentive only within its configured distance and charges zero shipping after qualification", async () => {
+    const f = await fixture("freeShipping");
+    const row = (await promotions.list()).find(campaign => campaign.id === f.campaign.id)!;
+    await promotions.update(String(row.id), Number(row.version), promotionCampaignInputSchema.parse({ name: row.name, code: row.code,
+      status: row.status, discountKind: "freeShipping", discountPercent: 0, automatic: true, distinctModels: true, minQuantity: 3,
+      perCustomerUsageLimit: 1, productScope: row.productScope,
+      smartBar: { enabled: true, showWithin: 1, message: "فاضلك {remaining} على {reward}" } }), actor, "shipping-bar");
+    await f.reserve([0]);
+    expect(await commerce.customerCartQuote(f.user, f.reservation)).toMatchObject({ shippingMinor: 10000, incentives: [] });
+    await f.reserve([0, 1]);
+    const incomplete = await commerce.customerCartQuote(f.user, f.reservation);
+    if (!("incentives" in incomplete)) throw new Error("Expected a current quote");
+    expect(incomplete.incentives).toEqual([expect.objectContaining({ remaining: 1, achieved: false, message: "فاضلك 1 على توصيل مجاني" })]);
+    await f.reserve([0, 1, 2]);
+    expect(await commerce.customerCartQuote(f.user, f.reservation)).toMatchObject({ shippingMinor: 0, totalMinor: 300000,
+      incentives: [expect.objectContaining({ remaining: 0, achieved: true })] });
+    const order = await commerce.checkout(f.user, f.input, "free-shipping", undefined, `KEY-${f.reservation}`);
+    expect(order.finalAmount).toBe(3000);
+    expect((await store.pool.query("SELECT discount_minor FROM promotion_usages WHERE order_id=$1", [order.id])).rows[0].discount_minor).toBe(10000);
+    await deliver(order);
+    const returned = await commerce.adminManualReturn(actor, { itemCode: f.pieces[0]![0]!, condition: "Good", reason: "Return", refundAmount: 0 }, "shipping-return");
+    expect(returned.refundAmount).toBe(1000);
+    expect((await promotions.quantityOffers(f.user)).some(campaign => campaign.id === f.campaign.id)).toBe(false);
+  });
+  it("gifts only the cheapest reserved piece, freezes its price, and settles broken-offer returns without over-refunding", async () => {
+    const f = await fixture("gift");
+    await store.pool.query("UPDATE catalog_models SET selling_minor=50000 WHERE model_id=$1", [f.models[0]]);
+    await f.reserve([0, 1]);
+    expect(await commerce.customerCartQuote(f.user, f.reservation)).toMatchObject({ totalMinor: 160000, discountMinor: 0 });
+    await f.reserve([0, 1, 2]);
+    const quote = await commerce.customerCartQuote(f.user, f.reservation);
+    expect(quote).toMatchObject({ totalMinor: 210000, discountMinor: 50000 });
+    if (!("lines" in quote)) throw new Error("Expected a current quote");
+    expect(quote.lines.find(line => line.modelId === f.models[0])).toMatchObject({ finalMinor: 0, discountSource: "Campaign" });
+    const order = await commerce.checkout(f.user, f.input, "gift-offer", undefined, `KEY-${f.reservation}`);
+    await deliver(order);
+    const first = await commerce.adminManualReturn(actor, { itemCode: f.pieces[1]![0]!, condition: "Good", reason: "Break threshold", refundAmount: 9000 }, "gift-return");
+    expect(first.refundAmount).toBe(500);
+    const second = await commerce.adminManualReturn(actor, { itemCode: f.pieces[0]![0]!, condition: "Good", reason: "Return gift", refundAmount: 9000 }, "gift-return");
+    expect(second.refundAmount).toBe(500);
+    await commerce.adminManualReturn(actor, { itemCode: f.pieces[2]![0]!, condition: "Good", reason: "Return rest", refundAmount: 9000 }, "gift-return");
+    expect(Number((await store.pool.query("SELECT amount_refunded_minor FROM orders WHERE id=$1", [order.id])).rows[0].amount_refunded_minor)).toBe(200000);
+  });
+  it("keeps per-piece Birthday pricing when the order earns a separate shipping reward", async () => {
+    const f = await fixture("freeShipping", 2);
+    await store.pool.query("UPDATE customers SET birthday=$2 WHERE user_id=$1", [f.user, `2000-${cairoDateKey().slice(5)}`]);
+    await f.reserve([0, 1]);
+    expect(await commerce.customerCartQuote(f.user, f.reservation)).toMatchObject({ shippingMinor: 0, totalMinor: 140000, discountMinor: 60000 });
+    const order = await commerce.checkout(f.user, f.input, "shipping-birthday", undefined, `KEY-${f.reservation}`);
+    expect(order.finalAmount).toBe(1400);
+    const sources = (await store.pool.query("SELECT discount_source FROM order_items WHERE order_id=$1", [order.id])).rows;
+    expect(sources.every(line => line.discount_source === "Birthday")).toBe(true);
+  });
+  it("counts only delivered paid pieces for an optional one-time card, hides distant/ineligible progress, and awards once", async () => {
+    const f = await fixture("percent", 2);
+    const settings = { dartCardEnabled: true, shoppingBar: { enabled: true, durationSeconds: 6,
+      cardGoal: { enabled: true, targetPieces: 2, showWithin: 1, message: "" } } };
+    const client = await store.pool.connect();
+    try {
+      expect(await cardGoalProgress(client, f.user, settings, 5)).toEqual([]);
+      expect(await cardGoalProgress(client, null, settings, 5)).toEqual([]);
+      settings.shoppingBar.cardGoal.showWithin = 2;
+      expect(await cardGoalProgress(client, f.user, settings, 2)).toEqual([expect.objectContaining({ remaining: 2, current: 0 })]);
+      expect(await cardGoalProgress(client, f.user, { ...settings, dartCardEnabled: false }, 2)).toEqual([]);
+      await store.pool.query("UPDATE site_settings SET data=data || $1::jsonb WHERE id='main'", [JSON.stringify(settings)]);
+      await f.reserve([0, 1]);
+      const order = await commerce.checkout(f.user, f.input, "goal-order", undefined, `KEY-${f.reservation}`);
+      expect((await store.pool.query("SELECT record_id FROM loyalty_cards WHERE record_id=$1", [`CARD-GOAL-${f.user}`])).rows).toHaveLength(0);
+      await deliver(order);
+      const awarded = (await store.pool.query("SELECT payload FROM loyalty_cards WHERE record_id=$1", [`CARD-GOAL-${f.user}`])).rows;
+      expect(awarded).toHaveLength(1); expect(awarded[0].payload).toMatchObject({ source: "Purchase Goal", status: "Active", itemLimit: 10 });
+      await awardPurchaseGoalCard(client, String(order.id));
+      expect((await store.pool.query("SELECT record_id FROM loyalty_cards WHERE record_id=$1", [`CARD-GOAL-${f.user}`])).rows).toHaveLength(1);
+      expect(await cardGoalProgress(client, f.user, settings)).toEqual([]);
+    } finally {
+      client.release();
+      await store.pool.query("UPDATE site_settings SET data=data - 'shoppingBar' || '{\"dartCardEnabled\":false}'::jsonb WHERE id='main'");
+    }
   });
   it("applies the same policy to staff intake and representative pickup, including a safe retry", async () => {
     const f = await fixture(); await f.reserve([0, 1, 2]);

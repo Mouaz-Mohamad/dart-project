@@ -387,17 +387,7 @@ function showToast(message) {
 }
 
 function showCartBanner(productTitle) {
-  let banner = document.getElementById("cartBanner");
-  if (!banner) {
-    banner = document.createElement("div");
-    banner.id = "cartBanner";
-    banner.className = "cart-banner";
-    document.body.appendChild(banner);
-  }
-  banner.textContent = `تم إضافة "${String(productTitle || "")}" للسلة`;
-  banner.classList.add("show");
-  clearTimeout(window.cartBannerTimeout);
-  window.cartBannerTimeout = window.setTimeout(() => banner.classList.remove("show"), 2500);
+  void window.DartShoppingBarReady?.(productTitle).catch(() => showToast("تمت الإضافة إلى السلة"));
 }
 
 async function persistCartReservation(previous) {

@@ -12,7 +12,7 @@ const config = { sessionCookieName: "dart_session", authPepper: "quantity-test-p
 const cookie = `dart_session=123e4567-e89b-12d3-a456-426614174100.${"a".repeat(43)}`;
 const staffCookie = cookie.replace("dart_session=", "dart_session_staff=");
 function fixture(type: "staff" | "customer" = "customer", permissions: string[] = [], mfaSatisfied = true) {
-  const service = { quantityOffers: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ version: 1 }) };
+  const service = { quantityOffers: vi.fn().mockResolvedValue([]), cardProgress: vi.fn().mockResolvedValue({ incentives: [] }), create: vi.fn().mockResolvedValue({ version: 1 }) };
   const account = { userId: "123e4567-e89b-12d3-a456-426614174101", accountType: type, permissions,
     mfaRequired: type === "staff", mfaSatisfied, csrfTokenHash: hashCsrfToken("csrf", config.authPepper) } as AuthenticatedAccount;
   const identity = { authenticate: vi.fn().mockResolvedValue(account) } as unknown as IdentityService;
@@ -25,6 +25,16 @@ function fixture(type: "staff" | "customer" = "customer", permissions: string[] 
 }
 
 describe("quantity offer HTTP authority", () => {
+  it("keeps card progress customer-only and always derives the customer from the authenticated session", async () => {
+    const f = fixture();
+    expect((await request(f.app).get("/me/promotions/card-progress")).status).toBe(401);
+    const reply = await request(f.app).get("/me/promotions/card-progress?customerUserId=someone-else").set("Cookie", cookie);
+    expect(reply.status).toBe(200); expect(reply.headers["cache-control"]).toBe("no-store");
+    expect(f.service.cardProgress).toHaveBeenCalledWith("123e4567-e89b-12d3-a456-426614174101");
+    const staff = fixture("staff", ["promotions.read"]);
+    expect((await request(staff.app).get("/me/promotions/card-progress").set("Cookie", cookie)).status).toBe(403);
+    expect(staff.service.cardProgress).not.toHaveBeenCalled();
+  });
   it("serves only the public projection to guests and derives account identity from the session", async () => {
     const { app, service } = fixture();
     const publicReply = await request(app).get("/promotions/quantity-offers?customerUserId=someone-else");

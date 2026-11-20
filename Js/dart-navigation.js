@@ -7,6 +7,26 @@
   const queue = [], seen = new Set(), controllers = new Set();
   let active = 0, started = false, paused = false, restoring = false;
 
+  let shoppingFlight;
+  root.DartShoppingBarReady = async title => {
+    if (!root.DartShoppingBar) {
+      if (!shoppingFlight) shoppingFlight = new Promise((resolve, reject) => {
+        const script = doc.createElement("script");
+        script.src = doc.querySelector("link[data-dart-shopping-bar]")?.href || "/Js/dart-shopping-bar.js";
+        script.onload = resolve;
+        script.onerror = () => { script.remove(); shoppingFlight = null; reject(new Error("Shopping feedback unavailable")); };
+        doc.head.appendChild(script);
+      });
+      await shoppingFlight;
+    }
+    if (typeof title === "string") root.DartShoppingBar.added(title);
+  };
+  doc.addEventListener("dart:critical-ready", () => {
+    const load = () => void root.DartShoppingBarReady().catch(() => {});
+    if (root.requestIdleCallback) root.requestIdleCallback(load, { timeout: 800 });
+    else root.setTimeout(load, 0);
+  }, { once: true });
+
   function publicUrl(href) {
     try {
       const url = new URL(href, root.location.href);

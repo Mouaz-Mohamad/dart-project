@@ -58,6 +58,10 @@ export function createPromotionRouter(
     response.setHeader("Cache-Control", "no-store");
     response.json({ offers: await promotions.quantityOffers(request.auth!.userId) });
   });
+  router.get("/me/promotions/card-progress", signedIn, requireAccountType("customer"), async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.json(await promotions.cardProgress(request.auth!.userId));
+  });
 
   router.get(
     "/me/promotions/validate-v2",
