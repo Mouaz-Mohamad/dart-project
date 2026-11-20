@@ -12,12 +12,19 @@ function connectionStringForPool(databaseUrl: string, databaseSsl: boolean): str
   return parsed.toString();
 }
 
+// One serverless instance can be multiplied hundreds of times during traffic bursts.
+// Limit each Vercel instance to two local sockets; Neon PgBouncer should multiplex them.
+// Do not silently change connection limits in local development or migration tooling.
+export function effectiveDatabasePoolMax(configuredMax: number, isVercel = Boolean(process.env.VERCEL)): number {
+  return isVercel ? Math.min(2, configuredMax) : configuredMax;
+}
+
 export function createDatabasePool(
   config: Pick<AppConfig, "databaseUrl" | "databaseSsl" | "databasePoolMax">,
 ): Pool {
   const pool = new Pool({
     connectionString: connectionStringForPool(config.databaseUrl, config.databaseSsl),
-    max: config.databasePoolMax,
+    max: effectiveDatabasePoolMax(config.databasePoolMax),
     ssl: config.databaseSsl ? { rejectUnauthorized: true } : false,
     application_name: "dart-backend",
     idleTimeoutMillis: 5_000,
