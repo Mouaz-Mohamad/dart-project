@@ -50,7 +50,8 @@ async function recovery() {
   const context = { API_BASE: "https://synthetic.test", cartData: state.dart_cart, CART_RESERVATION_ID: "CART-OLD",
     currentUser: () => ({ id: "U1", name: "Synthetic", email: fields.email }), displayPhone: (x) => x,
     read: (key, fallback) => state[key] ?? fallback, write: (key, value) => state[key] = value,
-    sessionStorage: { setItem: (key, value) => storage.set(key, value) }, uid: () => "CART-NEW",
+    sessionStorage: { setItem: (key, value) => storage.set(key, value),
+      getItem: (key) => storage.get(key) || null, removeItem: (key) => storage.delete(key) }, uid: () => "CART-NEW",
     setCartReservationId(value) { context.CART_RESERVATION_ID = value; }, renderCart() {}, updateCartCount() {}, showToast() {},
     async hydrateCustomerCommerce() {}, async saveCustomerAddress() {},
     window: { dartCheckoutAddress: { validate: () => ({ ok: true, zone: "cairo-giza" }) } },
@@ -69,6 +70,7 @@ async function recovery() {
   assert.equal(posts, 1); assert.equal(quoteCalls, 2);
   // The empty-cart submit recovery also runs before address validation.
   context.CART_RESERVATION_ID = "CART-OLD";
+  storage.set("dart_checkout_pending_reservation_id", "CART-OLD");
   assert.equal((await context.checkout({})).orderId, "K-COMMITTED"); assert.equal(posts, 1);
   context.apiRequest = async () => { throw Object.assign(new Error("expired"), { status: 409 }); };
   await assert.rejects(context.checkout({}), /السلة فارغة/);

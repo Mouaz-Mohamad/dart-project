@@ -1,6 +1,7 @@
   let cartQuoteCache = null;
   let cartQuotePending = null;
   let reviewedQuote = null;
+  const CHECKOUT_PENDING_RECOVERY_KEY = "dart_checkout_pending_reservation_id";
   function cartQuoteSignature() {
     const cart = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
     return JSON.stringify([currentUser()?.id, CART_RESERVATION_ID, ["Promotion", "DiscountCode"].includes(window.dartAppliedPromotion?.type) ? window.dartAppliedPromotion.code : "",
@@ -14,6 +15,7 @@
     invalidateCartQuote();
     if (typeof cartData !== "undefined") cartData = [];
     write("dart_cart", []);
+    sessionStorage.removeItem?.(CHECKOUT_PENDING_RECOVERY_KEY);
     setCartReservationId(uid("CART"));
     window.dartAppliedPromotion = null;
     sessionStorage.setItem("dart_last_order_id", order.orderId);
@@ -25,12 +27,20 @@
     // reservation ID without an owner cookie only produces a false 403.
     // Keep recovery for a locally retained cart after a committed checkout.
     const pendingLines = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
-    if (!Array.isArray(pendingLines) || pendingLines.length === 0) return null;
+    const hasPendingPost = sessionStorage.getItem?.(CHECKOUT_PENDING_RECOVERY_KEY) === CART_RESERVATION_ID;
+    if ((!Array.isArray(pendingLines) || pendingLines.length === 0) && !hasPendingPost) return null;
     try {
       const quote = await quoteCart({ force: true });
-      return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;
+      if (quote?.completedOrder) return finishApiCheckout(quote.completedOrder);
+      // Server confirmed there is no committed order; don't keep retrying a
+      // non-existent checkout on every public page load.
+      sessionStorage.removeItem?.(CHECKOUT_PENDING_RECOVERY_KEY);
+      return null;
     } catch (error) {
-      if ([403, 404, 409].includes(error.status)) return null;
+      if ([403, 404, 409].includes(error.status)) {
+        sessionStorage.removeItem?.(CHECKOUT_PENDING_RECOVERY_KEY);
+        return null;
+      }
       throw error;
     }
   }
@@ -209,6 +219,9 @@
       // GPS or manual-address change made while that request was in flight.
       if (!quote.completedOrder) assertAddressUnchanged();
       let response;
+      // Persist a narrow recovery intent before POST. Network failure after
+      // commit can then be reconciled even if the local cart was cleared.
+      if (!quote.completedOrder) sessionStorage.setItem(CHECKOUT_PENDING_RECOVERY_KEY, CART_RESERVATION_ID);
       try {
         response = quote.completedOrder ? { order: quote.completedOrder } : await apiRequest(logged ? "/api/v1/orders" : "/api/v1/guest/orders", {
         method: "POST",
@@ -249,6 +262,9 @@
         },
       });
       } catch (error) {
+        if (error.code === "PRICE_CHANGED" || (error.status >= 400 && error.status < 500)) {
+          sessionStorage.removeItem?.(CHECKOUT_PENDING_RECOVERY_KEY);
+        }
         if (error.code === "PRICE_CHANGED") {
           const fresh = !logged && error.details?.quote ? error.details.quote : await quoteCart({ force: true });
           reviewedQuote = { signature: cartQuoteSignature(), fingerprint: fresh.fingerprint, ...(!logged ? { quote: fresh } : {}) };
