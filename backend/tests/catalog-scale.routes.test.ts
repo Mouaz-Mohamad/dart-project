@@ -18,7 +18,7 @@ function application(options: { permissions?: string[]; mfaSatisfied?: boolean; 
     sessionFamilyId: randomUUID(), csrfTokenHash: hashCsrfToken(csrf, config.authPepper),
     mfaRequired: true, mfaSatisfied: options.mfaSatisfied ?? true, permissions: options.permissions ?? ["catalog.read", "catalog.edit"] };
   const identity = { authenticate: vi.fn().mockResolvedValue(account) } as unknown as IdentityService;
-  const service = { publicCatalog: vi.fn().mockResolvedValue({ version: 1, models: [], stock: {} }),
+  const service = { version: vi.fn().mockResolvedValue(1), publicCatalog: vi.fn().mockResolvedValue({ version: 1, models: [], stock: {} }),
     adminState: vi.fn().mockResolvedValue({ version: 1, models: [], items: [] }),
     replaceState: vi.fn().mockResolvedValue({ version: 2, models: [], items: [] }) };
   const app = createApp(config, { identityService: identity, catalogService: service as unknown as CatalogService,
@@ -32,6 +32,12 @@ describe("catalogue scale HTTP boundaries", () => {
     const { app, service } = application();
     expect((await request(app).get("/api/v1/catalog")).status).toBe(200);
     expect(service.publicCatalog).toHaveBeenLastCalledWith(undefined);
+    const version = await request(app).get("/api/v1/catalog/version");
+    expect(version.status).toBe(200);
+    expect(version.body).toEqual({ version: 1 });
+    expect(version.headers["cache-control"]).toBe("public, max-age=0, must-revalidate");
+    expect(version.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=3, stale-while-revalidate=3");
+    expect(service.version).toHaveBeenCalledTimes(1);
     const response = await request(app).get("/api/v1/catalog").query({ page: 2, limit: 50, q: " shirt ", sort: "price-low" });
     expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("public, max-age=0, must-revalidate");
     expect(response.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=3, stale-while-revalidate=3");

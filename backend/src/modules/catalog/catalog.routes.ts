@@ -68,7 +68,12 @@ export function createCatalogRouter(
   });
 
   router.get("/catalog/version", async (_request, response) => {
-    response.setHeader("Cache-Control", "no-store");
+    // Public, non-personalized version reads may be frequent during traffic
+    // spikes. Match the short catalogue CDN TTL; checkout always checks live
+    // server-side inventory and pricing before committing any order.
+    response.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    response.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=3, stale-while-revalidate=3");
+    response.removeHeader("Pragma");
     response.status(200).json({ version: await catalog.version() });
   });
 
