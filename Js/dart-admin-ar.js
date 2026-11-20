@@ -45,6 +45,12 @@
     const original = node.nodeValue;
     const next = translated(original);
     if (!next) return;
+    // An <option> without value= derives its business value from its label.
+    // Freeze that original value before replacing only the visible label.
+    const parent = node.parentElement;
+    if (parent?.tagName === "OPTION" && !parent.hasAttribute("value")) {
+      parent.value = parent.value;
+    }
     const before = original.match(/^\s*/)[0];
     const after = original.match(/\s*$/)[0];
     const replacement = before + next + after;

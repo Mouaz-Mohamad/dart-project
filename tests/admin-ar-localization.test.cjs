@@ -24,6 +24,11 @@ function element(tag, attributes = {}, childNodes = []) {
     hasAttribute(name) { return Object.hasOwn(this.attributes, name); },
     getAttribute(name) { return this.attributes[name]; },
     setAttribute(name, value) { this.attributes[name] = value; },
+    get value() {
+      return this.hasAttribute("value") ? this.getAttribute("value")
+        : this.childNodes.filter(child => child.nodeType === 3).map(child => child.nodeValue).join("").trim();
+    },
+    set value(value) { this.setAttribute("value", String(value)); },
     closest(selector) {
       if (this.tagName === "CODE") return this;
       if (selector.includes(".dart-typing-preview") && this.attributes.class?.split(/\s+/).includes("dart-typing-preview")) return this;
@@ -44,7 +49,9 @@ const action = element("button", { "aria-label": "Confirm Dispatch" }, [text("Co
 const retained = element("strong", {}, [text("Dart Card")]);
 const preview = element("span", { class: "dart-typing-preview" }, [text("Today")]);
 const code = element("code", {}, [text("Code Model")]);
-const body = element("body", {}, [title, input, area, action, retained, code, preview]);
+const statusOption = element("option", {}, [text("Active")]);
+const explicitOption = element("option", { value: "Accepted" }, [text("Accepted")]);
+const body = element("body", {}, [title, input, area, action, retained, code, preview, statusOption, explicitOption]);
 let observerCallback;
 let observerOptions;
 const document = {
@@ -86,6 +93,10 @@ assert.equal(action.getAttribute("aria-label"), "تأكيد خروج الأور�
 assert.equal(action.childNodes[0].nodeValue, "تأكيد خروج الأوردر للتوصيل");
 assert.equal(retained.childNodes[0].nodeValue, "Dart Card");
 assert.equal(code.childNodes[0].nodeValue, "Code Model");
+assert.equal(statusOption.childNodes[0].nodeValue, "نشط", "Select option label should be Arabic");
+assert.equal(statusOption.value, "Active", "Implicit select value must remain the backend identifier");
+assert.equal(explicitOption.childNodes[0].nodeValue, "مقبول");
+assert.equal(explicitOption.value, "Accepted", "Explicit select value must be unchanged");
 assert.equal(preview.childNodes[0].nodeValue, "Today", "Merchant-authored text must remain exactly as entered");
 assert.ok(observerOptions.characterData && observerOptions.childList);
 const appended = element("span", {}, [text("3 selected")]);
@@ -98,6 +109,12 @@ changed.parentElement = appended;
 appended.childNodes[0] = changed;
 observerCallback([{ type: "characterData", target: changed }]);
 assert.equal(changed.nodeValue, "كود الموديل");
+const dynamicOption = element("option", {}, [text("New")]);
+dynamicOption.parentElement = body;
+body.childNodes.push(dynamicOption);
+observerCallback([{ type: "childList", addedNodes: [dynamicOption] }]);
+assert.equal(dynamicOption.childNodes[0].nodeValue, "جديد");
+assert.equal(dynamicOption.value, "New", "Dynamic option value must be preserved");
 const changedPreview = text("Today");
 changedPreview.parentElement = preview;
 preview.childNodes[0] = changedPreview;
