@@ -21,6 +21,11 @@
   }
   async function recoverCompletedCheckout() {
     if (!API_BASE) return null;
+    // A fresh anonymous visit has no cart to recover. Quoting the generated
+    // reservation ID without an owner cookie only produces a false 403.
+    // Keep recovery for a locally retained cart after a committed checkout.
+    const pendingLines = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
+    if (!Array.isArray(pendingLines) || pendingLines.length === 0) return null;
     try {
       const quote = await quoteCart({ force: true });
       return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;

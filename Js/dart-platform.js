@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:cae8b4cede67bec62ec1b8cb726ea404aa3d07b114db7e8899f6f15e412cf4ae */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:3aa42e8bb2f5c86402c5c1353bb1e0f47182029c56edc708bc470dfcf4c11922 */
 (function () {
   "use strict";
 
@@ -1475,6 +1475,11 @@
   }
   async function recoverCompletedCheckout() {
     if (!API_BASE) return null;
+    // A fresh anonymous visit has no cart to recover. Quoting the generated
+    // reservation ID without an owner cookie only produces a false 403.
+    // Keep recovery for a locally retained cart after a committed checkout.
+    const pendingLines = typeof cartData !== "undefined" ? cartData : read("dart_cart", []);
+    if (!Array.isArray(pendingLines) || pendingLines.length === 0) return null;
     try {
       const quote = await quoteCart({ force: true });
       return quote?.completedOrder ? finishApiCheckout(quote.completedOrder) : null;

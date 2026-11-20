@@ -104,6 +104,20 @@ async function staleHydration() {
   finish({ cart: { reservationId: "ACCOUNT", expiresAt: expiry, lines: [{ modelId: "EXISTING", size: "L", color: "Black", quantity: 1 }] } });
   await pending; assert.equal(gate.cartData[0].id, "EXISTING", "Add must wait for the account's existing basket");
 }
+async function noQuoteForEmptyGuestCart() {
+  const c = cartContext();
+  c.currentUser = () => null;
+  c.cartData = [];
+  c.state.dart_cart = [];
+  let quoteRequests = 0;
+  c.apiRequest = async () => { quoteRequests++; return { completedOrder: null }; };
+  vm.runInContext(read("src/storefront/platform/checkout.js"), c);
+  assert.equal(await c.recoverCompletedCheckout(), null);
+  assert.equal(quoteRequests, 0, "empty guest carts must not quote a non-owned placeholder ID");
+  c.cartData = [{ id: "M1", size: "M", color: "Black", quantity: 1 }];
+  await c.recoverCompletedCheckout();
+  assert.equal(quoteRequests, 1, "pending guest checkout recovery must remain possible");
+}
 async function checkoutRetry() {
   const c = cartContext(); let offline = true, posted = 0;
   c.cartData = [{ id: "M1", size: "M", color: "Black", quantity: 1, reservationUntil: new Date(Date.now() + 60000).toISOString() }];
@@ -175,5 +189,5 @@ async function availability(pickup = false) {
   offline = true; await assert.rejects(service.load({ force: true }), /Synthetic outage/);
   assert.equal(service.isAddressCovered({ governorate: "Giza" }), false, "outage must not silently restore Cairo/Giza");
 }
-(async () => { await recovery(); await conflict(); await staleHydration(); await checkoutRetry(); sessionCleanup(); await availability(); await availability(true); console.log("PASS guest navigation recovery, explicit cart conflicts, stale GET/mutation races, authenticated cart readiness, email verification, external checkout and nationwide pickup coverage retries"); })()
+(async () => { await noQuoteForEmptyGuestCart(); await recovery(); await conflict(); await staleHydration(); await checkoutRetry(); sessionCleanup(); await availability(); await availability(true); console.log("PASS guest navigation recovery, explicit cart conflicts, stale GET/mutation races, authenticated cart readiness, email verification, external checkout and nationwide pickup coverage retries"); })()
   .catch(error => { console.error(error); process.exitCode = 1; });
