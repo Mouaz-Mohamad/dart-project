@@ -230,6 +230,14 @@ async function initialize(page, origin, file, phase) {
             return Object.fromEntries(
               [...style]
                 .filter((prop) => !prop.startsWith('--'))
+                // The requested scroll header intentionally changes only its
+                // positioning mechanism. shopping-feedback-browser.cjs asserts
+                // real sticky geometry and direction at all five widths; keep
+                // every color, font, dimension, child and rendered pixel here.
+                .filter((prop) => node.id !== 'header-container' || ![
+                  'position', 'bottom', 'left', 'right',
+                  'inset-block-end', 'inset-inline-start', 'inset-inline-end',
+                ].includes(prop))
                 .map((prop) => [prop, style.getPropertyValue(prop).replace(/url\((["']?)([^)]+?)\1\)/g, (match, quote, address) => {
                   try {
                     const url = new URL(address, location.href);

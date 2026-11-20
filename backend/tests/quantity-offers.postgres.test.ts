@@ -115,7 +115,7 @@ describe("quantity offers on the production schema", () => {
       incentives: [expect.objectContaining({ remaining: 0, achieved: true })] });
     const order = await commerce.checkout(f.user, f.input, "free-shipping", undefined, `KEY-${f.reservation}`);
     expect(order.finalAmount).toBe(3000);
-    expect((await store.pool.query("SELECT discount_minor FROM promotion_usages WHERE order_id=$1", [order.id])).rows[0].discount_minor).toBe(10000);
+    expect(Number((await store.pool.query("SELECT discount_minor FROM promotion_usages WHERE order_id=$1", [order.id])).rows[0].discount_minor)).toBe(10000);
     await deliver(order);
     const returned = await commerce.adminManualReturn(actor, { itemCode: f.pieces[0]![0]!, condition: "Good", reason: "Return", refundAmount: 0 }, "shipping-return");
     expect(returned.refundAmount).toBe(1000);
