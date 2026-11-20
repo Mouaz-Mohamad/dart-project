@@ -13,6 +13,15 @@
 /* BEGIN Tablet / narrow desktop */
 @media (prefers-reduced-motion: reduce) {
   #header-container { transition: none; }
+  .cart-banner-progress-fill { transition: none; }
+}
+
+@media (max-width: 380px) {
+  .cart-banner-link { padding: 11px 12px; }
+  .cart-banner-summary { gap: 8px; }
+  .cart-banner-count { min-width: 34px; height: 34px; font-size: 15px; }
+  .cart-banner-action strong { font-size: 14px; }
+  .cart-banner-price { font-size: 16px; }
 }
 
 @media (max-width: 370px) {
@@ -78,10 +87,6 @@
 
 /* BEGIN Mobile storefront and representative layout */
 @media (max-width: 700px) {
-  .cart-banner-link { align-items: flex-start; flex-direction: column; gap: 9px; padding: 12px; }
-  .cart-banner-copy { width: 100%; }
-  .cart-banner-copy strong { font-size: 14px; }
-  .cart-banner-action { padding: 7px 12px; }
   /* Match news ticker, cart button and menu offset to the compact header. */
   .under-nav,
   .dart-nav-ticker,

@@ -2,7 +2,9 @@
 
 The shared header stays visible near the top, hides on downward scrolling and returns immediately on upward movement anywhere in the document. Keyboard focus and an open Menu keep it visible. Clipping uses `overflow-x:clip` on the body and `overflow:clip` on the actual `.mother` page shell after installation, so neither ancestor traps sticky positioning. The browser fixture includes that production shell; a bare-header fixture missed its original `overflow:hidden` interaction during the first release check.
 
-Successful additions call one shared bar through the deferred feedback loader. The whole message links to the canonical cart. On the cart page it opens checkout without reloading the customer's address. Confirmation lasts six seconds by default and pauses during focus/hover. Server-verified offer progress can remain after confirmation; Close dismisses it until cart/session changes. Late responses cannot restore another customer's message. Errors leave only the successful-addition confirmation, never an invented benefit.
+The compact burgundy bar stays fixed exactly 15px from the left, right and bottom edges of the viewport. It shows the number of pieces, **عرض السلة**, and the server-priced item total after discounts, excluding delivery. The bar remains visible while the cart contains pieces, including after the short added confirmation expires. The confirmation lasts six seconds by default and pauses during focus/hover. The whole message links to the canonical cart; on the cart page it opens checkout without reloading the customer's address.
+
+An eligible personalized offer expands the same bar with its reward title, remaining-count message and a white progress line. The line fills from right to left according to the server's current/target values and animates as progress changes; reduced-motion preferences disable that animation. The page reserves the measured bar height so its last controls remain reachable. Close dismisses the bar until cart/session changes. Empty carts hide it unless the server returns an eligible card goal. Pricing failures retain the cart link with an unknown-price marker; old prices and private messages are cleared immediately on cart/session changes, and late responses cannot restore them.
 
 ## Configuration
 
@@ -20,26 +22,33 @@ The different-model checkbox controls counting. Model-discounted pieces and Sets
 
 ## Implementation and validation
 
-- `src/storefront/shopping-bar.js` owns feedback, scroll behavior, races and dismissal; `Js/dart-navigation.js` provides its deferred, versioned loader. Sources rebuild through the existing frontend commands.
+- `src/storefront/shopping-bar.js` owns the compact/expanded cart, server price projection, progress, scroll behavior, races and dismissal; `Js/dart-navigation.js` provides its deferred, versioned loader. `Js/dart-ui.js` forwards accepted checkout quotes to the same bar. `CSS/main.css` and `CSS/responsive.css` own its fixed insets and responsive layout. Sources rebuild through the existing frontend commands. The visual revision adds no endpoint, database migration or campaign activation.
 - `promotion.service.ts` validates and selects relevant campaign progress; `commerce.service.ts` computes shipping/gifts and returns progress in the owned cart quote. `card-purchase-goal.ts` derives private progress and awards a stable card under the existing card lock/guard, with audit history.
 - The existing settings/promotions endpoints persist JSON to PostgreSQL with normal permissions and version checks. `GET /me/promotions/card-progress` adds a private, no-store read. No migration or new paid service is required. No production campaign or card goal was activated during implementation.
 - Local backend check: 143 suites and 1,016 tests passed, plus the added customer-progress HTTP authorization case passed separately. Integration scenarios cover configured display distance, true zero shipping, shipping plus Birthday pricing, cheapest-piece gifting, cumulative gift returns, paid-delivered goal counting and duplicate-award prevention. External/database-only scenarios keep their existing skips.
 - All 67 maintained frontend static checks pass. Dedicated runtime tests cover direction, overscroll, focus, cart links, safe text, progress, dismissal, empty carts, session races and service failures. Initial/core and homepage JavaScript remain within their existing budgets.
-- `shopping-feedback-browser.cjs` passed real CSS geometry at 370/480/767/768/1366px in Chromium CI: sticky header return mid-page, bar bounds/progress/CTA and dismissal. The general CSS comparison retains fonts/colors/sizes/children/pixels; only the header's deliberately changed positioning properties are compared by this dedicated test. Local Chromium was unavailable. Full browser CI and production alias checks must succeed before reporting the release live.
+- Visual revision local validation: production assets build, all 67 static checks pass, and shipping integration verifies that only accepted quotes reach the bar. The existing shared money formatter keeps initial/core payload within its 966 KiB limit. Local Chromium cannot launch under the host's socket restrictions; the required Chromium CI suite verifies the six-width geometry before Vercel releases the commit.
+- `shopping-feedback-browser.cjs` covers real CSS geometry at 320/370/480/767/768/1366px: exact 15px insets, server total/count, compact versus expanded height, white progress at two-thirds and completion, fixed placement while scrolling, real cart-link navigation, page clearance and dismissal. The general CSS comparison retains fonts/colors/sizes/children/pixels; only the header's deliberately changed positioning properties are compared by this dedicated test. Full browser CI and production alias checks must succeed before reporting a release live.
 
 ## Quality review
 
 | Item | Result | Evidence |
 | --- | --- | --- |
-| 1. States | Pass | Empty, failed, repeated and late progress responses are covered |
-| 2. Server authority | Pass | DB-backed eligibility, reserved pieces, pricing and refund snapshots |
-| 3. Concurrency | Pass; real DB CI required | Existing campaign/order/card locks, unique goal-card identity and versioned saves |
+| 1. States | Pass | Empty, loading, failed, dismissed, repeated and late price/progress responses are covered |
+| 2. Server authority | Pass | Only integer EGP totals from owned quotes; DB-backed offer eligibility and pricing |
+| 3. Concurrency | Pass | Cart/session sequence guards and accepted-quote identity; existing campaign/order/card locks |
 | 4. Validation / access | Pass | Strict Zod input, Staff permissions/MFA/CSRF, own-session private progress |
 | 5. Idempotency | Pass | Checkout retry, cumulative refunds, stable goal-card insertion |
 | 6. Audit | Pass | Existing campaign/settings audit plus purchase-goal issuance audit |
 | 7. Services / cost | N/A | No message/provider call or new paid service |
-| 8. Regressions | Local pass; browser CI required | Existing frontend/backend suites and scoped changes |
+| 8. Regressions | Local pass; browser CI required | Persistent CTA, checkout quote forwarding, header and responsive layout coverage |
 | 9. Tests | Pass | Runtime, money, PostgreSQL-schema and authorization scenarios above |
 | 10. Secrets | Pass | No credentials or durable business data added to browser files |
 
 Pause a campaign or card goal to stop future eligibility. Preserve the gift settlement logic for orders already sold under these offers; existing order snapshots and awarded cards must remain readable after rollback.
+
+## Manual review of the visual revision
+
+1. Add a piece: the compact bar shows the piece count, **عرض السلة**, the quoted item total and the short confirmation. Wait for the confirmation to expire: the cart bar remains.
+2. With an explicitly configured eligible offer, confirm its name and remaining count appear in the taller bar. Add a qualifying piece and confirm the white line advances. Recheck 15px insets while scrolling and at mobile/desktop widths.
+3. Open the cart through the bar; confirm its item total agrees with the cart before delivery, and accepted coupon changes update both. Remove all pieces, dismiss/reopen through a cart change, and verify no stale customer message survives logout.

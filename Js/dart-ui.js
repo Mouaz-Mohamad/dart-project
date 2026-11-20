@@ -847,9 +847,10 @@ function applyCartQuote(quote) {
     if (!quote?.fingerprint || window.DartPlatform?.currentCartQuote?.()?.fingerprint !== quote.fingerprint) return false;
     for (const [id, value] of [['subtotalVal', quote.subtotalMinor], ['discountVal', quote.discountMinor], ['shippingVal', quote.shippingMinor ?? 0], ['totalVal', quote.totalMinor]]) {
         const el = document.getElementById(id);
-        if (el) { el.textContent = `${(value / 100).toLocaleString('en-EG', { maximumFractionDigits: 2, useGrouping: false })} EGP`; el.removeAttribute('aria-busy'); }
+        if (el) { el.textContent = `${DartState.formatMoney(value / 100)} EGP`; el.removeAttribute('aria-busy'); }
     }
     window.dartDisplayedTotalMinor = quote.totalMinor;
+    window.DartShoppingBar?.updateQuote?.(quote);
     window.DartStorefront?.renderOffers?.();
     return true;
 }

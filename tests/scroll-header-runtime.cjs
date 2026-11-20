@@ -7,7 +7,7 @@ const header = { dataset: {}, offsetHeight: 108, querySelector: () => ({}), cont
   classList: { add: value => classes.add(value), remove: value => classes.delete(value) },
   addEventListener: (type, action) => { headerEvents[type] = action; } };
 const document = { readyState: "complete", activeElement: null,
-  documentElement: { scrollHeight: 5000 }, body: { classList: { add() {}, contains: () => false } },
+  documentElement: { scrollHeight: 5000 }, body: { classList: { add() {}, remove() {}, contains: () => false } },
   getElementById: () => header,
   addEventListener: (type, action) => { (docEvents[type] ||= []).push(action); } };
 const window = { document, scrollY: 0, innerHeight: 800, location: { href: "https://dart.example/", origin: "https://dart.example" },

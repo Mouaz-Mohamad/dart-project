@@ -32,11 +32,16 @@
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", installScrollHeader, { once: true });
   else installScrollHeader();
 
-  let node, link, heading, detail, progress, action, title = "", incentives = [], version = 0;
+  let node, link, heading, detail, progress, fill, offerCopy, count, price, priceLabel, feedback, live;
+  let title = "", incentives = [], quote = null, version = 0, loading = false;
   let confirmationUntil = 0, timer = 0, refreshTimer = 0, dismissed = false, paused = false;
-  const cart = () => root.DartState?.read?.("dart_cart", []) || [];
+  const cart = () => { const lines = root.DartState?.read?.("dart_cart", []); return Array.isArray(lines) ? lines : []; };
   const options = () => root.DartSiteSettings?.get?.().shoppingBar || {};
   const duration = () => Math.min(30, Math.max(4, Number(options().durationSeconds) || 6)) * 1000;
+  function reserveSpace() {
+    const height = node && !node.hidden ? Math.ceil(node.getBoundingClientRect?.().height || 0) + 30 : 0;
+    doc.documentElement?.style?.setProperty("--dart-shopping-bar-space", `${height}px`);
+  }
   function ensure() {
     if (node) return;
     node = doc.createElement("aside"); node.id = "cartBanner"; node.className = "cart-banner";
@@ -47,55 +52,99 @@
       if (!checkout || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); checkout.click();
     });
-    const copy = doc.createElement("span"); copy.className = "cart-banner-copy";
-    const live = doc.createElement("span"); live.setAttribute("role", "status"); live.setAttribute("aria-live", "polite"); live.setAttribute("aria-atomic", "true");
-    heading = doc.createElement("strong"); detail = doc.createElement("span");
-    detail.className = "cart-banner-detail"; live.append(heading, detail);
-    progress = doc.createElement("progress"); progress.className = "cart-banner-progress";
+    const summary = doc.createElement("span"); summary.className = "cart-banner-summary";
+    count = doc.createElement("span"); count.className = "cart-banner-count";
+    const action = doc.createElement("span"); action.className = "cart-banner-action";
+    const label = doc.createElement("strong"); label.textContent = "عرض السلة";
+    feedback = doc.createElement("span"); feedback.className = "cart-banner-feedback"; feedback.textContent = "تمت الإضافة ✓";
+    action.append(label, feedback);
+    const amount = doc.createElement("span"); amount.className = "cart-banner-amount";
+    price = doc.createElement("bdi"); price.dir = "ltr"; price.className = "cart-banner-price";
+    priceLabel = doc.createElement("span"); priceLabel.className = "cart-banner-price-label";
+    amount.append(price, priceLabel); summary.append(count, action, amount);
+    offerCopy = doc.createElement("span"); offerCopy.className = "cart-banner-offer";
+    heading = doc.createElement("strong"); heading.className = "cart-banner-offer-title";
+    detail = doc.createElement("span"); detail.className = "cart-banner-detail";
+    progress = doc.createElement("span"); progress.className = "cart-banner-progress";
+    progress.setAttribute("role", "progressbar"); progress.setAttribute("aria-valuemin", "0");
     progress.setAttribute("aria-label", "التقدم نحو العرض");
-    action = doc.createElement("span"); action.className = "cart-banner-action";
-    copy.append(live, progress); link.append(copy, action);
+    fill = doc.createElement("span"); fill.className = "cart-banner-progress-fill"; progress.append(fill);
+    live = doc.createElement("span"); live.className = "sr-only";
+    live.setAttribute("role", "status"); live.setAttribute("aria-live", "polite"); live.setAttribute("aria-atomic", "true");
+    offerCopy.append(heading, detail, progress); link.append(summary, offerCopy, live);
     const close = doc.createElement("button"); close.type = "button"; close.className = "cart-banner-close";
     close.textContent = "×"; close.setAttribute("aria-label", "إغلاق إشعار السلة");
     close.addEventListener("click", () => { dismissed = true; hide(); });
     node.append(link, close); doc.body.append(node);
+    if (root.ResizeObserver) new root.ResizeObserver(reserveSpace).observe(node);
+    root.addEventListener("resize", reserveSpace);
     node.addEventListener("pointerenter", () => { paused = true; root.clearTimeout(timer); });
     node.addEventListener("pointerleave", resume);
     node.addEventListener("focusin", () => { paused = true; root.clearTimeout(timer); });
     node.addEventListener("focusout", () => { if (!node.contains(doc.activeElement)) resume(); });
     node.addEventListener("keydown", event => { if (event.key === "Escape") { dismissed = true; hide(); } });
   }
-  function hide() { root.clearTimeout(timer); if (node) { node.hidden = true; node.classList.remove("show"); } }
+  function hide() {
+    root.clearTimeout(timer); paused = false;
+    if (node) { node.hidden = true; node.classList.remove("show"); }
+    doc.body?.classList.remove("dart-cart-bar-visible"); reserveSpace();
+  }
   function resume() { paused = false; if (title) confirmationUntil = Date.now() + duration(); render(); }
+  function itemTotal(payload) {
+    if (payload?.currency !== "EGP" || !Number.isSafeInteger(payload.totalMinor) ||
+        !Number.isSafeInteger(payload.shippingMinor) || payload.shippingMinor < 0 || payload.totalMinor < payload.shippingMinor) return null;
+    return payload.totalMinor - payload.shippingMinor;
+  }
+  function offerTitle(offer) {
+    if (offer.title && offer.title !== "كمّل اختياراتك واستفيد") return offer.title;
+    return ({ freeShipping: "توصيل مجاني", gift: "هدية على طلبك", percent: "خصم على طلبك", fixed: "خصم على طلبك", card: "Dart Card" })[offer.type] || "عرض خاص ليك";
+  }
   function render() {
     root.clearTimeout(timer);
     if (dismissed || !doc.body || doc.hidden) return hide();
     const offer = options().enabled === false ? null : incentives[0];
     const added = title && Date.now() < confirmationUntil;
-    if (!added && !offer) return hide();
+    const quantity = cart().reduce((sum, line) => sum + (Number.isSafeInteger(line.quantity) && line.quantity > 0 ? line.quantity : 0), 0);
+    if (!quantity && !added && !offer) return hide();
     ensure();
-    heading.textContent = added ? `تمت إضافة «${title}» إلى السلة` : offer.title;
-    detail.textContent = offer ? offer.message : "اختياراتك جاهزة — افتح السلة وكمّل طلبك";
-    progress.hidden = !offer;
-    if (offer) { progress.max = Math.max(1, Number(offer.target)); progress.value = Math.min(progress.max, Math.max(0, Number(offer.current))); }
-    action.textContent = "إتمام الشراء ←";
+    count.textContent = String(quantity); count.setAttribute("aria-label", `${quantity} قطعة في السلة`);
+    const minor = quantity ? itemTotal(quote) : 0;
+    price.textContent = minor === null ? (loading ? "…" : "—") : `${(minor / 100).toLocaleString("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+    price.setAttribute("aria-busy", String(loading));
+    priceLabel.textContent = minor === null ? (loading ? "جارٍ الحساب" : "راجع السلة") : "إجمالي القطع";
+    feedback.hidden = !added;
+    offerCopy.hidden = !offer;
+    let progressTransform;
+    if (offer) {
+      heading.textContent = offerTitle(offer); detail.textContent = offer.message;
+      const target = Number.isFinite(Number(offer.target)) ? Math.max(1, Number(offer.target)) : 1;
+      const current = Number.isFinite(Number(offer.current)) ? Math.min(target, Math.max(0, Number(offer.current))) : 0;
+      progress.setAttribute("aria-valuemax", String(target)); progress.setAttribute("aria-valuenow", String(current));
+      progress.setAttribute("aria-valuetext", offer.message); progressTransform = `scaleX(${current / target})`;
+    }
+    const announcement = added ? `تمت إضافة «${title}» إلى السلة` : (offer?.message || "");
+    if (live.textContent !== announcement) live.textContent = announcement;
+    if (offer) node.classList.add("cart-banner-expanded"); else node.classList.remove("cart-banner-expanded");
     node.hidden = false; node.classList.add("show");
+    doc.body.classList.add("dart-cart-bar-visible"); reserveSpace();
+    if (offer) fill.style.transform = progressTransform;
     if (added && !paused) timer = root.setTimeout(() => { title = ""; render(); }, Math.max(0, confirmationUntil - Date.now()));
   }
   async function refresh() {
     const sequence = ++version;
-    incentives = []; render();
+    incentives = []; quote = null; loading = Boolean(cart().length); render();
     try {
       let payload;
       if (cart().length) payload = await root.DartPlatform?.quoteCart?.({ force: true });
       else if (root.DartPlatform?.currentUser?.()) payload = await root.DartPlatform.apiRequest("/api/v1/me/promotions/card-progress");
       if (sequence !== version) return;
+      quote = payload; loading = false;
       incentives = Array.isArray(payload?.incentives) ? payload.incentives : [];
       render();
-    } catch { if (sequence === version) { incentives = []; render(); } }
+    } catch { if (sequence === version) { incentives = []; quote = null; loading = false; render(); } }
   }
   function changed() {
-    ++version; incentives = []; dismissed = false;
+    ++version; incentives = []; quote = null; loading = Boolean(cart().length); dismissed = false;
     if (!cart().length) { title = ""; hide(); } else render();
     root.clearTimeout(refreshTimer); refreshTimer = root.setTimeout(() => void refresh(), 180);
   }
@@ -104,6 +153,11 @@
     confirmationUntil = Date.now() + duration(); render();
     root.clearTimeout(refreshTimer); void refresh();
   }
+  function updateQuote(payload) {
+    if (!payload || root.DartPlatform?.currentCartQuote?.() !== payload) return;
+    ++version; quote = payload; loading = false;
+    incentives = Array.isArray(payload.incentives) ? payload.incentives : []; render();
+  }
   root.addEventListener("dart:data-changed", event => { if (event.detail?.key === "dart_cart") changed(); });
   root.addEventListener("dart:customer-session-changed", () => { title = ""; changed(); });
   root.addEventListener("dart:site-settings-changed", changed);
@@ -111,7 +165,7 @@
   root.addEventListener("pageshow", changed);
   doc.addEventListener("visibilitychange", () => { if (doc.hidden) hide(); else changed(); });
   doc.addEventListener("dart:critical-ready", changed);
-  root.DartShoppingBar = Object.freeze({ added, refresh });
+  root.DartShoppingBar = Object.freeze({ added, refresh, updateQuote });
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", changed, { once: true });
   else changed();
 })(window);
