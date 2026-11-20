@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:77aeade38eb16148fe268fb4eb84180422f5057f31b5ba25c7fe044399f7877f */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:79ff294e03458ee8bbf12d0c6a7a0c52ebe26bd8f0a847f9216b1a1b092ed80f */
 /* BEGIN WebP runtime fallback for dynamically assigned local images */
 (function installDartWebpFallback() {
   if (window.__dartWebpFallbackInstalled) return;
@@ -4744,38 +4744,32 @@ function renderTopClients() {
       : monthFilter?.value || "current";
   // END Exclusive period filters.
 
+  // Linear-time aggregation: avoid scanning every order separately for every customer.
+  // Preserve exact clientId equality and the existing delivered/period/refund rules.
+  const totalsByClient = new Map();
+  for (const order of ordersData) {
+    if (order.status !== "Delivered") continue;
+    const date = new Date(order.deliveredAt || order.createdAt || 0);
+    if (Number.isNaN(date.getTime())) continue;
+    if (selectedYear !== "all" && selectedMonth !== "all") {
+      if (selectedYear !== "none") {
+        if (date.getFullYear() !== Number(selectedYear)) continue;
+      } else if (
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` !== selectedMonth
+      ) continue;
+    }
+    const totals = totalsByClient.get(order.clientId) || { delivered: 0, spent: 0 };
+    totals.delivered += 1;
+    totals.spent += Math.max(0, dartOrderNet(order) - (Number(order.amountRefunded) || 0));
+    totalsByClient.set(order.clientId, totals);
+  }
+
   const rows = customersData
     .filter(dartIsActive)
-    .map((c) => {
-      const eligible = ordersData.filter((order) => {
-        if (order.status !== "Delivered" || order.clientId !== c.clientId)
-          return false;
-        const date = new Date(order.deliveredAt || order.createdAt || 0);
-        if (Number.isNaN(date.getTime())) return false;
-        if (selectedYear === 'all' || selectedMonth === 'all') return true;
-        if (selectedYear !== "none")
-          return date.getFullYear() === Number(selectedYear);
-        return (
-          `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` ===
-          selectedMonth
-        );
-      });
-      return {
-        c,
-        s: {
-          delivered: eligible.length,
-          spent: eligible.reduce(
-            (sum, order) =>
-              sum +
-              Math.max(
-                0,
-                dartOrderNet(order) - (Number(order.amountRefunded) || 0),
-              ),
-            0,
-          ),
-        },
-      };
-    })
+    .map((c) => ({
+      c,
+      s: totalsByClient.get(c.clientId) || { delivered: 0, spent: 0 },
+    }))
     .filter(({ s }) => s.delivered > 0)
     .sort((a, b) => b.s.delivered - a.s.delivered || b.s.spent - a.s.spent)
     .slice(0, 100);
