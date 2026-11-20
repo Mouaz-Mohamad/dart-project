@@ -111,6 +111,17 @@ export interface AppDependencies extends HealthDependencies {
 // Keep runtime behavior unchanged while presenting the middleware factory shape to TypeScript.
 const createHelmetMiddleware = helmet as unknown as () => RequestHandler;
 
+// Only these anonymous read-only paths avoid a write to PostgreSQL per view.
+// Never whitelist account, checkout, admin, reservations, or mutation endpoints.
+const PUBLIC_READ_LIMIT_PATHS = new Set([
+  "/api/v1/catalog", "/api/v1/catalog/version", "/api/v1/site-settings",
+  "/api/v1/sets", "/api/v1/sets/settings", "/api/v1/reviews",
+]);
+
+export function isPublicReadRateLimitPath(method: string, path: string): boolean {
+  return (method === "GET" || method === "HEAD") && PUBLIC_READ_LIMIT_PATHS.has(path);
+}
+
 export function createApp(config: AppConfig, dependencies: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
@@ -137,10 +148,31 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
       dependencies.commerceService ? reply => dependencies.commerceService!.orderWhatsAppReply(reply) : undefined,
       () => dispatchOutbox(dependencies.outboxService, 5)));
   }
+  // Cheap per-instance protection for public reads; enforce distributed DDoS
+  // policy at Vercel WAF. All writes and private routes keep the shared limiter.
+  app.use(
+    rateLimit({
+      skip: request => !isPublicReadRateLimitPath(request.method, request.path),
+      windowMs: config.rateLimitWindowMs,
+      limit: config.rateLimitMax,
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      handler(_request, response) {
+        const value = response.getHeader("x-request-id");
+        response.status(429).json({
+          error: {
+            code: "RATE_LIMITED", message: "Too many requests",
+            requestId: typeof value === "string" || typeof value === "number" ? String(value) : "unknown",
+          },
+        });
+      },
+    }),
+  );
   app.use(
     rateLimit({
       store: sharedRateLimitStore(config, "application"),
-      skip: request => request.path === "/api/v1/health/live",
+      skip: request => request.path === "/api/v1/health/live" ||
+        isPublicReadRateLimitPath(request.method, request.path),
       windowMs: config.rateLimitWindowMs,
       limit: config.rateLimitMax,
       standardHeaders: "draft-8",
