@@ -48,12 +48,13 @@ describe("Brand detail SQL", () => {
         const ledger = report as { rows: Array<{ lane: string; amountMinor: number }>; totals: { amountMinor: number } };
         expect(ledger.rows.reduce((sum, row) => sum + (metric === "profit" && row.lane === "outgoing" ? -row.amountMinor : row.amountMinor), 0)).toBe(ledger.totals.amountMinor);
         if (metric !== "profit") expect(ledger.totals).not.toHaveProperty("incomeMinor");
+        else expect(ledger.totals).toMatchObject({amountMinor:-503,incomeMinor:22500,costMinor:23003});
         if (metric === "cost") expect(ledger.rows.find(row => (row as {id?:string}).id === "expense:e1")).toMatchObject({reference:"فاتورة التصوير"});
       }
       const overview = await service.brandDetails("overview", "2026-10-01", "2026-10-30", 1, 100, visibility);
       expect(overview).toMatchObject({ totals: { pieces: 2, models: 1, costMinor: 27005, sellingMinor: 85002 }, top: { models: { waiting: 3, total: 4, sold: 0 } } });
       const limited = await service.brandDetails("cost", "2026-10-01", "2026-10-30", 2, 1, visibility);
-      expect(limited).toMatchObject({ page: 2, limit: 1, total: 2 });
+      expect(limited).toMatchObject({ page: 2, limit: 1, total: 3 });
       expect((limited as { rows: unknown[] }).rows).toHaveLength(1);
       const restricted = await service.brandDetails("stockSelling", "2026-10-01", "2026-10-30", 1, 100, { costs: false, waiting: false, sales: false });
       expect(JSON.stringify(restricted)).not.toContain('"costMinor"');

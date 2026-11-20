@@ -128,7 +128,7 @@
     if (tab === "budgets") return hasAdminPermission("finance.read") || financeCanView("cost") || financeCanManage("budgets");
     if (tab === "invoices") return hasAdminPermission("finance.read") || financeCanManage("invoices");
     if (tab === "goals") return hasAdminPermission("finance.read") || financeCanManage("goals") || financeCanView("revenue") || financeCanView("cost") || financeCanView("profit") || financeCanView("marketing");
-    if (tab === "pnl") return financeCanView("revenue") && financeCanView("cost") && financeCanView("profit");
+    if (tab === "pnl") return ["revenue", "cost", "profit", "cashflow"].every(financeCanView);
     if (tab === "cashflow" || tab === "cod") return financeCanView("cashflow") || financeCanManage("settlements");
     if (tab === "models") return financeCanView("revenue") && financeCanView("cost");
     if (tab === "marketing") return financeCanView("marketing") || financeCanManage("marketing");
@@ -641,8 +641,10 @@
       goals: overrides.goals || [],
       marketing: overrides.marketing || [],
       settlements: overrides.settlements || [],
+      incomes: overrides.incomes || [],
     };
     return {
+      incomes: incomeRows,
       orders: typeof ordersData !== "undefined" ? ordersData : readJSON("dart_orders", []),
       returns: typeof returnsData !== "undefined" ? returnsData : readJSON("dart_returns", []),
       items: typeof itemsData !== "undefined" ? itemsData : readJSON("dart_items", []),
@@ -1001,7 +1003,7 @@
     const grossRevenue = roundMoney(delivered.reduce((sum, order) => sum + orderAmount(order), 0));
     const refunds = refundAmountForRange(data, range);
     const netRevenue = roundMoney(grossRevenue - refunds);
-    const grossCogs = roundMoney(
+    const capturedCogs = roundMoney(
       delivered.reduce(
         (sum, order) =>
           sum +
@@ -1012,6 +1014,14 @@
         0,
       ),
     );
+    // Legacy browser projections may contain the replacement line only.
+    // Keep the cost of a damaged sold original once when that line is absent.
+    const capturedCodes = new Set(delivered.flatMap(order => orderLines(order).map(line => String(line.itemCode || ""))));
+    const exchangedOriginals = new Set(uniqueCompletedReturns(data, range)
+      .filter(row => isExchangeReturn(row) && returnInspection(row) === "Damaged" && !capturedCodes.has(String(row.itemCode || "")))
+      .map(row => String(row.itemCode || "")));
+    const exchangedDamageCost = damageWriteOff({ ...data, damage: data.damage.filter(row => exchangedOriginals.has(String(row.itemCode || ""))) }, range);
+    const grossCogs = roundMoney(capturedCogs + exchangedDamageCost);
     const cogsReversal = returnedGoodCost(data, range);
     const netCogs = roundMoney(grossCogs - cogsReversal);
     const expenseRows = recognizedExpenses(data, range);
@@ -1022,22 +1032,9 @@
     const damageValue = damagedInventoryValue(data, range);
     const returnCourierCosts = returnLogisticsCost(data, range);
     const deliveryCosts = deliveredDeliveryCost(data, range);
-    const totalOperatingExpenses = roundMoney(
-      operatingExpenses + codFees + damageLoss + returnCourierCosts,
-    );
-    const totalCost = roundMoney(netCogs + totalOperatingExpenses);
     const grossProfit = roundMoney(netRevenue - netCogs);
-    const netProfit = roundMoney(netRevenue - totalCost);
     const physicalItemCost = physicalItemAcquisitionCost(data, range);
     const incrementalDamage = incrementalDamageCost(data, range);
-    const brandTotalCost = roundMoney(
-      physicalItemCost +
-        operatingExpenses +
-        codFees +
-        returnCourierCosts +
-        incrementalDamage,
-    );
-    const brandNetProfit = roundMoney(netRevenue - brandTotalCost);
     const grossSoldUnits = delivered.reduce(
       (sum, order) => sum + orderLines(order).reduce((lineTotal, line) => lineTotal + Math.max(1, finiteNumber(line.qty, 1)), 0),
       0,
@@ -1067,11 +1064,22 @@
     );
     const paidExpenseCashOut = roundMoney(paidExpenses(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
     const inventoryPurchaseCashOut = roundMoney(paidInventoryAcquisitions(data, range).reduce((sum, expense) => sum + Math.max(0, finiteNumber(expense.amount)), 0));
+    const financingCashOut = roundMoney(data.expenses.filter(active)
+      .filter(row => String(row.status).toLowerCase() === "paid" && ["loan repayment", "capital withdrawal"].includes(String(row.category).toLowerCase()))
+      .filter(row => within(row.paidAt || row.date, range)).reduce((sum,row) => sum + Math.max(0,finiteNumber(row.amount)),0));
+    const receivedIncome = data.incomes.filter(row => row.status === "Received" && within(row.receivedOn, range));
+    const incomeCashIn = roundMoney(receivedIncome.reduce((sum,row) => sum + finiteNumber(row.amountMinor)/100,0));
+    const otherIncome = roundMoney(receivedIncome.filter(row => row.kind === "Other Income").reduce((sum,row) => sum + finiteNumber(row.amountMinor)/100,0));
     const refundCashOut = refunds;
     const cashOut = roundMoney(
-      paidExpenseCashOut + inventoryPurchaseCashOut + codFees + returnCourierCosts + refundCashOut,
+      paidExpenseCashOut + financingCashOut + inventoryPurchaseCashOut + codFees + returnCourierCosts + refundCashOut,
     );
 
+    const totalInflow = roundMoney(codCashIn + incomeCashIn);
+    const totalOperatingExpenses = roundMoney(cashOut - inventoryPurchaseCashOut);
+    const totalOutflow = roundMoney(netCogs + totalOperatingExpenses);
+    const totalCost = totalOutflow, brandTotalCost = totalOutflow;
+    const netProfit = roundMoney(totalInflow - totalOutflow), brandNetProfit = netProfit;
     const marketing = marketingStats(data, range);
     return {
       grossRevenue,
@@ -1088,15 +1096,17 @@
       deliveryCosts,
       totalOperatingExpenses,
       totalCost,
+      totalInflow,
+      totalOutflow,
       grossProfit,
       netProfit,
       physicalItemCost,
       incrementalDamage,
       brandTotalCost,
       brandNetProfit,
-      margin: netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0,
+      margin: totalInflow > 0 ? (netProfit / totalInflow) * 100 : 0,
       grossMargin: netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0,
-      marginApplicable: netRevenue > 0,
+      marginApplicable: totalInflow > 0,
       deliveredOrders: delivered.length,
       grossSoldUnits,
       returnedUnits,
@@ -1107,9 +1117,14 @@
       oneTimeCustomers,
       orderFrequencyBuckets,
       repeatRate: uniqueCustomers ? (returningCustomers / uniqueCustomers) * 100 : 0,
-      cashIn: codCashIn,
+      cashIn: totalInflow,
+      incomeCashIn,
+      orderCashIn: codCashIn,
+      otherIncome,
+      totalIncome: roundMoney(netRevenue + otherIncome),
+      financingCashOut,
       cashOut,
-      netCashFlow: roundMoney(codCashIn - cashOut),
+      netCashFlow: roundMoney(totalInflow - cashOut),
       paidExpenseCashOut,
       inventoryPurchaseCashOut,
       refundCashOut,
@@ -1907,8 +1922,8 @@
     }
 
     const mappings = [
-      [".sales-cont", "cashflow", current.cashIn, previous.cashIn, false],
-      [".cost-cont", "cashflow", current.cashOut, previous.cashOut, true],
+      [".sales-cont", "cashflow", current.totalInflow, previous.totalInflow, false],
+      [".cost-cont", "cost", current.totalOutflow, previous.totalOutflow, true],
       [".profit-cont", "profit", current.netProfit, previous.netProfit, false],
     ];
     mappings.forEach(([selector, section, value, prior, inverse]) => {
@@ -1926,8 +1941,8 @@
     });
     [
       [".sales-cont", "Total Inflow", "Confirmed order receipts and all received income in the selected period. Pending income is excluded."],
-      [".cost-cont", "Total Outflow", "Paid expenses on their payment dates, completed refunds and confirmed fees. Unpaid expenses are excluded."],
-      [".profit-cont", "Net Profit", "Delivered sales after discounts/refunds plus other received income, less sold-piece cost, paid operating expenses, fees and non-duplicated losses. Unsold inventory, capital and loans do not create profit or operating expense."],
+      [".cost-cont", "Total Outflow", "Sold-piece cost plus confirmed paid expenses, refunds and fees. Stock payments are replaced by sold-piece cost to avoid counting stock twice. Unpaid expenses and unsold stock are excluded."],
+      [".profit-cont", "Net Profit", "Total Inflow minus Total Outflow for the same period. Only confirmed receipts count as inflow; outflow includes sold-piece cost and confirmed paid expenses/payments."],
     ].forEach(([selector, title, description]) => {
       const info = document.querySelector(`#brand ${selector} .dart-info-btn`);
       if (info) {
@@ -2097,18 +2112,18 @@
       const label = period.start.toLocaleDateString("en-EG", { day: "numeric", month: "short" });
       return { label: dateInputValue(period.start) === dateInputValue(period.end) ? label
           : `${label}–${period.end.toLocaleDateString("en-EG", { day: "numeric", month: "short" })}`,
-        revenue: summary.cashIn, cost: summary.cashOut, profit: summary.netProfit };
+        revenue: summary.totalInflow, cost: summary.totalOutflow, profit: summary.netProfit };
     });
   }
 
   function renderFinancialChart(data, range, summary) {
-    if (!summaryAllowsAll(summary, ["profit"])) {
+    if (!summaryAllowsAll(summary, ["cashflow", "cost", "profit"])) {
       const canvas = document.getElementById("dart-financial-chart");
       if (canvas) canvas.hidden = true;
       const restricted = document.getElementById("dart-financial-empty");
       if (restricted) {
         restricted.hidden = false;
-        restricted.textContent = "Profit access is required for this chart.";
+        restricted.textContent = "Inflow, Cost and Profit access is required for this chart.";
       }
       return;
     }
@@ -2125,17 +2140,19 @@
       }
       return;
     }
-    const empty = buckets.every(bucket => bucket.profit === 0);
+    const empty = buckets.every(bucket => bucket.revenue === 0 && bucket.cost === 0 && bucket.profit === 0);
     toggleChartEmpty("dart-financial-empty", empty);
     if (canvas) canvas.hidden = empty;
     const emptyState = document.getElementById("dart-financial-empty");
-    if (emptyState) emptyState.textContent = empty ? "Net profit is zero throughout this period." : "";
+    if (emptyState) emptyState.textContent = empty ? "No inflow or outflow in this period." : "";
     if (empty) return;
     replaceChart("financial", "dart-financial-chart", {
       type: "bar",
       data: {
         labels: buckets.map((bucket) => bucket.label),
         datasets: [
+          { label: "Total Inflow", data: buckets.map((bucket) => bucket.revenue), backgroundColor: "#4A8A68", borderRadius: 4 },
+          { label: "Total Outflow", data: buckets.map((bucket) => bucket.cost), backgroundColor: "#9B8D93", borderRadius: 4 },
           { type: "line", label: "Net Profit", data: buckets.map((bucket) => bucket.profit), borderColor: "#AB012B", backgroundColor: "#AB012B", tension: .32, pointRadius: 3, borderWidth: 3 },
         ],
       },
@@ -2186,10 +2203,10 @@
       cards.push(kpiCard("Returning Customers", percent(current.repeatRate), `${current.returningCustomers} of ${current.uniqueCustomers} buyers`, "fa-solid fa-rotate", "blue"));
     }
     if (summaryAllowsAll(current, ["cost"]) && summaryAllowsAll(previous, ["cost"])) {
-      cards.push(kpiCard("P&L Total Cost", money(current.totalCost), "Net COGS + recognized period operating costs", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
+      cards.push(kpiCard("Total Outflow", money(current.totalOutflow), "Sold-piece cost + confirmed paid expenses/payments", "fa-solid fa-coins", "burgundy", { current: current.totalCost, previous: previous.totalCost }, true));
     }
     if (summaryAllowsAll(current, ["profit"]) && summaryAllowsAll(previous, ["profit"])) {
-      const marginText = current.marginApplicable !== false && finiteNumber(current.netRevenue) > 0
+      const marginText = current.marginApplicable !== false
         ? `${percent(current.margin)} net margin`
         : "Margin N/A for this period";
       cards.push(kpiCard("Net Profit", money(current.netProfit), marginText, "fa-solid fa-chart-line", current.netProfit >= 0 ? "green" : "red", { current: current.netProfit, previous: previous.netProfit }));
@@ -2204,11 +2221,11 @@
       cards.push(kpiCard("Marketing ROAS", `${decimal(current.marketing?.roas)}x`, `${money(current.marketing?.spend)} tracked spend`, "fa-solid fa-bullhorn", "neutral"));
     }
 
-    const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit"]) &&
-      summaryAllowsAll(previous, ["revenue", "cost", "profit"]);
+    const pnlAllowed = summaryAllowsAll(current, ["revenue", "cost", "profit", "cashflow"]) &&
+      summaryAllowsAll(previous, ["revenue", "cost", "profit", "cashflow"]);
     const pnlPanel = pnlAllowed
-      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Sales use their delivery date; operating expenses use their confirmed Paid Date.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Gross delivered revenue</dt><dd>${money(current.grossRevenue)}</dd></div><div><dt>Refunds in period</dt><dd>(${money(current.refunds)})</dd></div><div class="is-subtotal"><dt>Total Selling</dt><dd>${money(current.netRevenue)}</dd></div><div><dt>Other received income</dt><dd>${money(current.otherIncome || 0)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Operating expenses</dt><dd>(${money(current.operatingExpenses)})</dd></div><div><dt>Courier allocation (included in item cost)</dt><dd>${money(current.deliveryCosts)}</dd></div><div><dt>Representative exchange fees</dt><dd>(${money(current.returnCourierCosts)})</dd></div><div><dt>Non-duplicated damage loss</dt><dd>(${money(current.damageLoss)})</dd></div><div class="is-total"><dt>Total Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
-      : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
+      ? `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Net Profit = Total Inflow − Total Outflow.", '<button type="button" class="dart-link-btn" data-finance-tab="pnl">Full report</button>')}<dl class="dart-statement-list"><div><dt>Total Inflow</dt><dd>${money(current.totalInflow)}</dd></div><div><dt>Sold-piece cost</dt><dd>(${money(current.netCogs)})</dd></div><div><dt>Paid expenses and payments</dt><dd>(${money(current.totalOperatingExpenses)})</dd></div><div class="is-subtotal"><dt>Total Outflow</dt><dd>(${money(current.totalOutflow)})</dd></div><div class="is-total"><dt>Net Profit</dt><dd>${money(current.netProfit)}</dd></div></dl></article>`
+      : `<article class="dart-finance-panel">${sectionToolbar("P&L Snapshot", "Revenue + Cost + Profit + Cash Flow permissions are required.")}${restrictedFinanceMarkup("P&L is restricted for this Staff account.")}</article>`;
 
     return `${sectionToolbar("Financial Overview", `${range.label} · previous comparison uses ${range.previous.label}`)}
       <div class="dart-finance-kpi-grid">${cards.length ? cards.join("") : restrictedFinanceMarkup()}</div>
@@ -2223,8 +2240,8 @@
 
   function renderExpenses(data, range) {
     const rows = data.expenses.filter(active).filter((entry) => within(entry.date, range)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    return `${sectionToolbar("Expenses", "Only Paid expenses affect outflow and profit, on their Paid Date. Unpaid records remain pending. Inventory Acquisition, Loan Repayment and Capital Withdrawal affect cash only.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
-      <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is excluded from operating P&L and Owner Total Cost.</span></div>
+    return `${sectionToolbar("Expenses", "Only Paid expenses affect outflow and profit, on their Paid Date. Unpaid records remain pending. Inventory Acquisition records cash payments; sold-piece cost replaces stock payments in Total Outflow to prevent double counting.", `${financeExportButton("expenses")}${financeAddButton("expenses", "Add Expense")}`)}
+      <div class="dart-accounting-note"><i class="fa-solid fa-circle-info"></i><span>Use Inventory Acquisition only to record the actual cash payment for stock/manufacturing. The inventory cost itself already comes from item cost snapshots, so this category is replaced by sold-piece cost in Total Outflow.</span></div>
       ${tableShell(["Date", "Category", "Vendor", "Description", "Status", "Amount", "Payment", "Actions"], rows.map((row) => `<tr><td>${escapeHTML(row.date)}</td><td>${escapeHTML(row.category)}</td><td>${escapeHTML(row.vendor || "-")}</td><td>${escapeHTML(row.description || row.vendor || row.invoiceNumber || row.category || "Expense")}</td><td><span class="dart-status-chip is-${String(row.status || "unpaid").toLowerCase()}">${escapeHTML(row.status || "Unpaid")}</span></td><td>${money(row.amount)}</td><td>${escapeHTML(row.paymentMethod || "-")}</td><td>${actionButtons("expenses", row.id)}</td></tr>`).join(""), financeResourceStatus("expenses") ? "Saved expense records are loading or unavailable." : "No expenses exist in the selected period.", false)}`;
   }
 
@@ -2247,22 +2264,22 @@
   }
 
   function renderPnL(current, previous, range) {
-    if (!summaryAllowsAll(current, ["revenue", "cost", "profit"]) || !summaryAllowsAll(previous, ["revenue", "cost", "profit"])) {
-      return restrictedFinanceMarkup("Profit & Loss requires Revenue, Cost and Profit permissions.");
+    if (!summaryAllowsAll(current, ["revenue", "cost", "profit", "cashflow"]) || !summaryAllowsAll(previous, ["revenue", "cost", "profit", "cashflow"])) {
+      return restrictedFinanceMarkup("Profit & Loss requires Revenue, Cost, Profit and Cash Flow permissions.");
     }
     const lines = [
-      ["Gross delivered revenue", current.grossRevenue, previous.grossRevenue],
-      ["Less: period refunds", -current.refunds, -previous.refunds],
-      ["Net revenue", current.netRevenue, previous.netRevenue, "subtotal"],
-      ["Gross COGS", -current.grossCogs, -previous.grossCogs],
-      ["Good-return COGS reversal", current.cogsReversal, previous.cogsReversal],
-      ["Gross profit", current.grossProfit, previous.grossProfit, "subtotal"],
-      ["Other received income", current.otherIncome || 0, previous.otherIncome || 0],
-      ["Operating expenses", -current.operatingExpenses, -previous.operatingExpenses],
+      ["Order receipts", current.orderCashIn ?? current.cashIn, previous.orderCashIn ?? previous.cashIn],
+      ["Confirmed income", current.incomeCashIn || 0, previous.incomeCashIn || 0],
+      ["Total Inflow", current.totalInflow, previous.totalInflow, "subtotal"],
+      ["Gross sold-piece cost", -current.grossCogs, -previous.grossCogs],
+      ["Good-return cost reversal", current.cogsReversal, previous.cogsReversal],
+      ["Paid operating expenses", -current.operatingExpenses, -previous.operatingExpenses],
+      ["Confirmed financing payments", -(current.financingCashOut || 0), -(previous.financingCashOut || 0)],
+      ["Completed refunds", -current.refundCashOut, -previous.refundCashOut],
       ["COD fees", -current.codFees, -previous.codFees],
       ["Representative exchange fees", -current.returnCourierCosts, -previous.returnCourierCosts],
-      ["Pre-sale damage write-offs", -current.damageLoss, -previous.damageLoss],
-      ["Net profit", current.netProfit, previous.netProfit, "total"],
+      ["Total Outflow", -current.totalOutflow, -previous.totalOutflow, "subtotal"],
+      ["Net Profit", current.netProfit, previous.netProfit, "total"],
     ];
     return `${sectionToolbar("Profit & Loss", `${range.label} compared with ${range.previous.label}.`, financeExportButton("pnl"))}
       <article class="dart-finance-panel dart-statement-panel"><div class="dart-statement-header"><span>Account</span><span>Current</span><span>Previous</span><span>Change</span></div>${lines.map(([label, value, prior, type]) => { const delta = comparison(value, prior); return `<div class="dart-statement-row ${type ? `is-${type}` : ""}"><span>${escapeHTML(label)}</span><strong>${money(value)}</strong><span>${money(prior)}</span><span class="dart-kpi-change is-${delta.direction}">${escapeHTML(delta.text)}</span></div>`; }).join("")}<div class="dart-statement-foot">Gross margin ${current.marginApplicable ? percent(current.grossMargin) : "N/A"} · Net margin ${current.marginApplicable ? percent(current.margin) : "N/A"}</div></article>`;

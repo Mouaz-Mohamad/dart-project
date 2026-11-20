@@ -1011,7 +1011,7 @@ paths:
       parameters:
         - { in: query, name: year, required: true, schema: { type: integer, minimum: 1970, maximum: 9998 } }
       responses:
-        "200": { description: Year, EGP currency, sold_cost_paid_expenses basis, and twelve ordered month/netProfit entries. Negative profits are retained. }
+        "200": { description: Year, EGP currency, confirmed_inflow_minus_sold_cost_and_paid_outflow basis, and twelve ordered month/netProfit entries. Negative profits are retained. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationError" }

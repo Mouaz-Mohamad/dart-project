@@ -17,6 +17,8 @@ function financePool(options: {
   acquiredItems?: Array<{ item_code: string; cost_snapshot_minor: string; created_at?: Date }>;
   expensePayloads?: Array<Record<string, unknown>>;
   damagePayloads?: Array<Record<string, unknown>>;
+  settlementPayloads?: Array<Record<string, unknown>>;
+  incomePayloads?: Array<Record<string, unknown>>;
 } = {}) {
   const queries: string[] = [];
   const client = {
@@ -59,10 +61,11 @@ function financePool(options: {
         return { rows: payloads.map((payload) => ({ payload })) };
       }
       if (sql.includes("FROM damage_records")) return { rows: (options.damagePayloads || []).map(payload => ({ payload })) };
-      if (sql.includes("FROM finance_income_entries")) return { rows: [] };
+      if (sql.includes("FROM finance_income_entries")) return { rows: options.incomePayloads ?? [] };
       if (sql.includes("FROM finance_records")) {
         const domain = String(values[0] || "");
         if (domain === "finance_settlements") {
+          if (options.settlementPayloads) return { rows: options.settlementPayloads.map(payload => ({payload})) };
           return {
             rows: [{
               payload: {
@@ -91,6 +94,7 @@ function financePool(options: {
 describe("finance summary integrity", () => {
   it("uses payment dates, excludes unpaid expenses and unsold inventory from net profit",async()=>{
     const fixture=financePool({deliveredRows:[{id:"sold",order_code:"S-1",event_at:new Date("2026-09-10T12:00Z"),final_minor:"100000",cogs_minor:"40000",sold_units:"1"}],returnPayloads:[],
+      settlementPayloads:[{id:"receipt",amountReceived:1000,settlementDate:"2026-09-10"}],
       acquiredItems:[{item_code:"unsold",cost_snapshot_minor:"200000",created_at:new Date("2026-09-01T12:00Z")}],
       expensePayloads:[
         {id:"pending",date:"2026-09-01",amount:1000,status:"Unpaid",category:"Other"},
@@ -101,6 +105,31 @@ describe("finance summary integrity", () => {
     const [september,october]=await new FinanceService(fixture.pool as never).summaries([{start:"2026-09-01",end:"2026-09-30"},{start:"2026-10-01",end:"2026-10-31"}]);
     expect(september).toMatchObject({operatingExpenses:50,totalCost:450,netProfit:550,physicalItemCost:2000,cashOut:2050});
     expect(october).toMatchObject({operatingExpenses:60,netProfit:-60,cashOut:60});
+  });
+  it("reconciles confirmed inflow minus sold cost and paid expenses, without counting stock payments twice", async () => {
+    const fixture = financePool({
+      deliveredRows: [{id:"sold",order_code:"S",event_at:new Date("2026-09-10T12:00Z"),final_minor:"120000",cogs_minor:"40000",sold_units:"1"}],
+      returnPayloads: [], acquiredItems: [{item_code:"unsold",cost_snapshot_minor:"200000"}],
+      settlementPayloads: [{id:"receipt",amountReceived:750,settlementDate:"2026-09-10"}],
+      incomePayloads: [
+        {id:"received",kind:"Other Income",status:"Received",amount_minor:25000,received_on:"2026-09-11"},
+        {id:"pending",kind:"Other Income",status:"Pending",amount_minor:50000,expected_on:"2026-09-11"},
+      ],
+      expensePayloads: [
+        {id:"paid",status:"Paid",amount:100,date:"2026-09-01",paidAt:"2026-09-10"},
+        {id:"unpaid",status:"Unpaid",amount:999,date:"2026-09-01"},
+        {id:"stock-payment",status:"Paid",amount:2000,category:"Inventory Acquisition",date:"2026-09-10"},
+      ],
+    });
+    const summary = await new FinanceService(fixture.pool as never).summary("2026-09-01","2026-09-30");
+    expect(summary).toMatchObject({totalInflow:1000,totalOutflow:500,netProfit:500,netCogs:400,operatingExpenses:100,cashOut:2100});
+    expect(Math.round(summary.netProfit*100)).toBe(Math.round(summary.totalInflow*100)-Math.round(summary.totalOutflow*100));
+    const service = new FinanceService(fixture.pool as never);
+    const visibility = {costs:true,waiting:true,sales:true};
+    const outflow = await service.brandDetails("cost","2026-09-01","2026-09-30",1,100,visibility);
+    const profit = await service.brandDetails("profit","2026-09-01","2026-09-30",1,100,visibility);
+    expect(outflow).toMatchObject({totals:{amountMinor:50000}});
+    expect(profit).toMatchObject({totals:{amountMinor:50000,incomeMinor:100000,costMinor:50000}});
   });
   it.each([false, true])("posts exchange cost differences then cancels all COGS on a full good refund (captured=%s)", async captured => {
     const exchange = { id: "EX-1", orderId: "K-EX", itemCode: "A", replacementItemCode: "B",
@@ -229,7 +258,7 @@ describe("finance summary integrity", () => {
     expect(summary.physicalItemCost).toBe(400);
     expect(summary.operatingExpenses).toBe(0);
     expect(summary.totalCost).toBe(0);
-    expect(summary.brandTotalCost).toBe(400);
+    expect(summary.brandTotalCost).toBe(0);
     expect(summary.inventoryPurchaseCashOut).toBe(400);
     expect(summary.cashOut).toBe(400);
     expect(summary.netCashFlow).toBe(-400);

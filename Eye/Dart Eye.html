@@ -252,7 +252,7 @@
                     </div>
 
                     <div class="cost-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Total Outflow" data-info-text="Paid expenses, completed refunds and confirmed fees. Unpaid expenses are excluded." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Total Outflow" data-info-text="Sold-piece cost plus confirmed paid expenses, refunds and fees. Stock payments are replaced by sold-piece cost to avoid double counting." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
                             <h4><i class="fa-solid fa-coins"></i> Total Outflow</h4>
                             <span class="variance">—</span>
@@ -261,7 +261,7 @@
                     </div>
 
                     <div class="profit-cont">
-                        <button type="button" class="dart-info-btn" data-info-title="Net Profit" data-info-text="Profit after sold-piece cost and paid operating expenses. Unsold inventory cost is excluded." title="Info"><i class="fa-solid fa-info"></i></button>
+                        <button type="button" class="dart-info-btn" data-info-title="Net Profit" data-info-text="Total Inflow minus Total Outflow for the same selected period. Unpaid expenses and unsold stock are excluded." title="Info"><i class="fa-solid fa-info"></i></button>
                         <div class="card-top">
                             <h4><i class="fa-solid fa-chart-line"></i> Net Profit</h4>
                             <span class="variance">—</span>
@@ -272,7 +272,7 @@
 
                 <div class="dart-chart-card">
                     <div class="dart-controls">
-                        <div class="dart-chart-title"><strong>Net Profit</strong><small>Sold-piece cost and paid expenses by month</small></div>
+                        <div class="dart-chart-title"><strong>Net Profit</strong><small>Total Inflow minus Total Outflow by month</small></div>
                         <div class="dart-nav-controls">
                             <button type="button" class="dart-nav-btn" data-sales-year-delta="-1" aria-label="Previous profit year">❮</button>
                             <span id="displayLabel">2026</span>
@@ -371,7 +371,7 @@
                     </article>
                     <article id="financial-analysis-card" class="dart-finance-panel dart-financial-analysis-panel">
                         <div class="dart-panel-head">
-                            <div><h3>Net Profit Analysis</h3><p>Profit after sold-piece cost and confirmed paid operating expenses.</p></div>
+                            <div><h3>Net Profit Analysis</h3><p>Total Inflow, Total Outflow and Net Profit for the selected period.</p></div>
                             <span id="dart-financial-period" class="dart-panel-badge"></span>
                         </div>
                         <div class="dart-chart-frame">

@@ -36,6 +36,7 @@ const deliveredOrder = {
 
 
 const deliveryCostSummary = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:2000}],
   orders: [{
     ...deliveredOrder,
     id: "ORDER-DELIVERY-COST",
@@ -56,6 +57,7 @@ assert.strictEqual(deliveryCostSummary.netProfit, 1200);
 assert.strictEqual(deliveryCostSummary.cashOut, 0, "Courier allocation retained before Dart receipt must not be deducted again from Dart cash flow.");
 
 const returnedData = baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:1000}],
   orders: [{ ...deliveredOrder, amountRefunded: 1000, refundedAt: "2026-09-05T10:00:00+03:00" }],
   returns: [
     { id: "R-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Good", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05T11:00:00+03:00" },
@@ -100,13 +102,18 @@ assert.strictEqual(cashSummary.netProfit, 450);
 assert.strictEqual(cashSummary.cashIn, 1000);
 assert.strictEqual(cashSummary.cashOut, 150);
 assert.strictEqual(cashSummary.netCashFlow, 850);
+assert.strictEqual(cashSummary.totalOutflow, 550);
+assert.strictEqual(cashSummary.totalInflow - cashSummary.totalOutflow, cashSummary.netProfit);
 
 const paidWithoutSettlement = finance.calculateSummary(baseData({
   orders: [{ ...deliveredOrder, paymentStatus: "Paid", amountPaid: 0, paidAt: "2026-09-02" }],
 }), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(paidWithoutSettlement.cashIn, 0, "Paid by the customer is not a dated COD receipt into Dart cash.");
+assert.strictEqual(paidWithoutSettlement.totalOutflow, 400);
+assert.strictEqual(paidWithoutSettlement.netProfit, -400, "Unreceived order proceeds cannot create confirmed profit.");
 
 const damagedReturnData = baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:1000}],
   orders: [{ ...deliveredOrder, amountRefunded: 1000 }],
   returns: [{ id: "R-2", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Damaged", isPostDeliveryReturn: true, refundAmount: 1000, resolvedAt: "2026-09-05" }],
   damage: [{ id: "D-1", orderId: "K-1", itemCode: "I-1", modelId: "M-1", status: "Damaged", costSnapshot: 400, date: "2026-09-05" }],
@@ -118,6 +125,7 @@ assert.strictEqual(damagedReturnSummary.damageValue, 400, "Damage Value must sti
 assert.strictEqual(damagedReturnSummary.netProfit, -400);
 
 const discountedOrder = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:420}],
   orders: [{
     ...deliveredOrder,
     id: "ORDER-DISCOUNT",
@@ -131,9 +139,10 @@ const discountedOrder = finance.calculateSummary(baseData({
 }), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(discountedOrder.netRevenue, 420, "A 30% order discount must turn a 600 EGP item into 420 EGP selling value.");
 assert.strictEqual(discountedOrder.totalCost, 400, "The physical piece keeps its 400 EGP immutable cost.");
-assert.strictEqual(discountedOrder.netProfit, 20, "Net profit must be net selling minus cost.");
+assert.strictEqual(discountedOrder.netProfit, 20, "Confirmed receipt minus sold-piece cost is net profit.");
 
 const priceHistory = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:220}],
   orders: [
     { ...deliveredOrder, id: "PRICE-1", orderId: "K-PRICE-1", finalAmount: 100, deliveredAt: "2026-09-02", priceSnapshot: [{ itemCode: "PRICE-I-1", modelCode: "M-HISTORY", qty: 1, finalUnitPrice: 100, costSnapshot: 50 }] },
     { ...deliveredOrder, id: "PRICE-2", orderId: "K-PRICE-2", finalAmount: 120, deliveredAt: "2026-09-10", priceSnapshot: [{ itemCode: "PRICE-I-2", modelCode: "M-HISTORY", qty: 1, finalUnitPrice: 120, costSnapshot: 50 }] },
@@ -143,6 +152,7 @@ assert.strictEqual(priceHistory.netRevenue, 220, "Sales at 100 then 120 must agg
 assert.strictEqual(priceHistory.netProfit, 120);
 
 const firstExchange = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:600}],
   orders: [{ ...deliveredOrder, finalAmount: 600, priceSnapshot: [{ itemCode: "NEW-I", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] }],
   returns: [{ id: "EX-1", returnId: "R-EX-1", orderId: "K-1", itemCode: "OLD-I", requestType: "Exchange", status: "Completed", completedAt: "2026-09-05", inspectionStatus: "Good", brandCourierFee: 50, customerCourierFee: 0, isPostDeliveryReturn: true }],
 }), range("2026-09-01", "2026-09-30"));
@@ -186,7 +196,7 @@ const inventoryAcquisitionSummary = finance.calculateSummary(baseData({
 }), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(inventoryAcquisitionSummary.physicalItemCost, 400, "Inventory investment must come from the immutable item cost snapshot.");
 assert.strictEqual(inventoryAcquisitionSummary.operatingExpenses, 0, "Inventory Acquisition must not be expensed again through operating P&L.");
-assert.strictEqual(inventoryAcquisitionSummary.brandTotalCost, 400, "Owner Total Cost must not double-count the inventory payment record.");
+assert.strictEqual(inventoryAcquisitionSummary.brandTotalCost, 0, "Unsold stock payments stay out of Total Outflow until the piece is sold.");
 assert.strictEqual(inventoryAcquisitionSummary.inventoryPurchaseCashOut, 400, "A paid inventory acquisition must enter cash flow exactly once.");
 assert.strictEqual(inventoryAcquisitionSummary.cashOut, 400);
 assert.strictEqual(inventoryAcquisitionSummary.netCashFlow, -400);
@@ -273,6 +283,7 @@ for (const year of [2025, 2026]) {
 }
 
 const ownerCostScenario = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:420}],
   models: [{ id: "M1", modelId: "M-1", cost: 400 }],
   items: [{ id: "I1", itemCode: "I-1", modelId: "M-1", costSnapshot: 400, createdAt: "2026-09-02", status: "Sold" }],
   orders: [{ ...deliveredOrder, totalPrice: 600, finalAmount: 420, discount: 30, orderLevelDiscountAmount: 180, priceSnapshot: [{ itemCode: "I-1", modelCode: "M-1", qty: 1, originalUnitPrice: 600, finalUnitPrice: 600, costSnapshot: 400 }] }],
@@ -280,12 +291,13 @@ const ownerCostScenario = finance.calculateSummary(baseData({
 assert.strictEqual(ownerCostScenario.netRevenue, 420, "A 30% order discount on 600 EGP must produce 420 EGP total selling.");
 assert.strictEqual(ownerCostScenario.physicalItemCost, 400, "Brand cost must include every physical piece added in the period.");
 assert.strictEqual(ownerCostScenario.brandTotalCost, 400);
-assert.strictEqual(ownerCostScenario.brandNetProfit, 20, "Brand profit must be total selling minus complete Brand cost.");
+assert.strictEqual(ownerCostScenario.brandNetProfit, 20, "Brand profit must equal total confirmed inflow minus outflow.");
 const customerMetric = finance.brandMetrics(baseData({ customers: [{ id: "C1", clientId: "DA-1", registeredAt: "2026-09-12T10:00:00Z" }] }), range("2026-09-01", "2026-09-30"), finance.calculateSummary(baseData(), range("2026-09-01", "2026-09-30")));
 assert.strictEqual(customerMetric.customers, 1, "Customer KPI must recognize the registeredAt field used by dashboard-created customers.");
 
 // Owner scenario: five 600 EGP pieces, 400 EGP all-in cost, split across 3 COD orders (1 + 1 + 3).
 const ownerThreeOrderScenario = finance.calculateSummary(baseData({
+  settlements: [{id:"receipt",settlementDate:"2026-09-10",amountReceived:3000}],
   orders: [
     { ...deliveredOrder, id: "OWN-1", orderId: "K-OWN-1", finalAmount: 600, deliveryCost: 100, priceSnapshot: [{ itemCode: "OWN-I-1", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] },
     { ...deliveredOrder, id: "OWN-2", orderId: "K-OWN-2", finalAmount: 600, deliveryCost: 100, priceSnapshot: [{ itemCode: "OWN-I-2", modelCode: "M-1", qty: 1, finalUnitPrice: 600, costSnapshot: 400 }] },

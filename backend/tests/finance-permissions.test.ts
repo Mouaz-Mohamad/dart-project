@@ -12,10 +12,10 @@ const summary = {
   grossRevenue: 1000, refunds: 100, netRevenue: 900,
   grossCogs: 400, cogsReversal: 0, netCogs: 400,
   operatingExpenses: 50, codFees: 10, damageLoss: 0, damageValue: 20,
-  returnCourierCosts: 5, deliveryCosts: 100, totalOperatingExpenses: 65,
-  totalCost: 465, grossProfit: 500, netProfit: 435,
-  physicalItemCost: 800, incrementalDamage: 20, brandTotalCost: 885,
-  brandNetProfit: 15, margin: 48.33, grossMargin: 55.56, marginApplicable: true,
+  returnCourierCosts: 5, deliveryCosts: 100, totalOperatingExpenses: 165,
+  totalInflow: 900, totalOutflow: 565, totalCost: 565, grossProfit: 500, netProfit: 335,
+  physicalItemCost: 800, incrementalDamage: 20, brandTotalCost: 565,
+  brandNetProfit: 335, margin: 37.22, grossMargin: 55.56, marginApplicable: true,
   deliveredOrders: 2, grossSoldUnits: 2, returnedUnits: 0, soldUnits: 2,
   averageOrderValue: 450, uniqueCustomers: 2, returningCustomers: 0,
   oneTimeCustomers: 2,
@@ -42,10 +42,10 @@ describe("granular finance summary sections", () => {
     const app = express(); app.use(staffFieldAccess);
     app.get("/api/v1/admin/returns", (req, res) => {
       req.auth = { accountType: "staff", permissions: ["finance.view_cost"] } as unknown as AuthenticatedAccount;
-      res.json({ originalLineSnapshot: { costSnapshot: 300 }, grossProfit: 100 });
+      res.json({ originalLineSnapshot: { costSnapshot: 300 }, totalOutflow: 400, grossProfit: 100 });
     });
     const response = await request(app).get("/api/v1/admin/returns").expect(200);
-    expect(response.body).toEqual({ originalLineSnapshot: { costSnapshot: 300 } });
+    expect(response.body).toEqual({ originalLineSnapshot: { costSnapshot: 300 }, totalOutflow: 400 });
   });
   it("revenue does not expose cost, profit or cash-flow values", () => {
     const selected = financeSummarySection(summary, "revenue");
@@ -57,14 +57,14 @@ describe("granular finance summary sections", () => {
 
   it("cost does not expose revenue or profit", () => {
     const selected = financeSummarySection(summary, "cost");
-    expect(selected.totalCost).toBe(465);
+    expect(selected.totalCost).toBe(565);
     expect(selected).not.toHaveProperty("netRevenue");
     expect(selected).not.toHaveProperty("netProfit");
   });
 
   it("profit exposes only profit and margin outputs", () => {
     const selected = financeSummarySection(summary, "profit");
-    expect(selected.netProfit).toBe(435);
+    expect(selected.netProfit).toBe(335);
     expect(selected.marginApplicable).toBe(true);
     expect(selected).not.toHaveProperty("netRevenue");
     expect(selected).not.toHaveProperty("netCogs");

@@ -67,14 +67,14 @@ describe("income and third party order collection", () => {
     expect(events.rows[2]).toMatchObject({action:"INCOME_RECEIVED",actor_id:actor,request_id:"confirm"});
   });
 
-  it("separates loan/capital cash from profit and records repayment through expenses", async () => {
+  it("includes every confirmed income and paid repayment in the owner inflow-minus-outflow result", async () => {
     for (const kind of ["Capital","Loan"] as const) {
       const row=await incomes.create(actor,input({kind,expectedOn:"2020-03-01",amountMinor:50000}),kind);
       await incomes.change(actor,row.id,row.version,"receive",{receivedOn:"2020-03-02"},"receive");
     }
     await store.pool.query(`INSERT INTO finance_records(domain,record_id,position,payload)
       VALUES('finance_expenses',$1,1,$2::jsonb)`,[randomUUID(),JSON.stringify({id:randomUUID(),category:"Loan Repayment",date:"2020-03-02",paidAt:"2020-03-02",amount:100,status:"Paid"})]);
-    expect(await finance.summary("2020-03-02","2020-03-02")).toMatchObject({cashIn:1000,financingCashOut:100,cashOut:100,netCashFlow:900,otherIncome:0,netProfit:0,operatingExpenses:0});
+    expect(await finance.summary("2020-03-02","2020-03-02")).toMatchObject({cashIn:1000,financingCashOut:100,cashOut:100,netCashFlow:900,totalInflow:1000,totalOutflow:100,otherIncome:0,netProfit:900,operatingExpenses:0});
   });
 
   it("cancels pending entries, locks received history and rejects future receipt dates", async () => {

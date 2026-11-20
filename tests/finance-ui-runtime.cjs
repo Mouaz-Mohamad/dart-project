@@ -68,7 +68,7 @@ function reportPayload(url, makeSummary) {
 const context = vm.createContext({ window, globalThis: window, document, console, CustomEvent: class {}, clearTimeout() {}, URLSearchParams, FormData: class { constructor(f) { this.f = f; } entries() { return Object.entries(this.f.payload); } } });
 vm.runInContext(fs.readFileSync("Js/dart-state.js", "utf8"), context);
 let finance = fs.readFileSync("Eye/dart-finance.js", "utf8");
-finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance, financialBuckets, replaceChart, loadIncome, incomeCommand }; })(typeof window !== "undefined" ? window : globalThis);');
+finance = finance.replace('})(typeof window !== "undefined" ? window : globalThis);', 'root.__financeUi = { state, openResourceModal, closeFinanceModal, renderFinanceSection, saveFinanceForm, invalidateAuthoritativeFinance, financialBuckets, renderFinancialChart, replaceChart, loadIncome, incomeCommand }; })(typeof window !== "undefined" ? window : globalThis);');
 vm.runInContext(finance, context);
 const ui = window.__financeUi;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -249,7 +249,7 @@ async function main() {
 
   // Reuse canvas/chart instances. Previous-period callback changes must not be lost in JSON signatures.
   let created = 0, updated = 0, destroyed = 0;
-  window.Chart = class { constructor(_context, config) { created++; this.options = config.options; } update() { updated++; } destroy() { destroyed++; } };
+  window.Chart = class { constructor(_context, config) { created++; this.data = config.data; this.options = config.options; } update() { updated++; } destroy() { destroyed++; } };
   nodes.get("dart-financial-chart").getContext = () => ({});
   const config = (prior) => ({ type: "line", data: { labels: ["Oct"], datasets: [{ data: [200] }] },
     options: { plugins: { tooltip: { callbacks: { label: () => String(prior) } } } } });
@@ -264,6 +264,29 @@ async function main() {
   ui.replaceChart("financial", "dart-financial-chart", config(8));
   assert.equal(updated, 1); assert.equal(created, 1); assert.equal(destroyed, 0);
   assert.equal(ui.state.charts.financial.options.plugins.tooltip.callbacks.label(), "8");
+
+  // Net Profit Analysis must retain all three authoritative series, even at break-even.
+  window.DartAdminApi.request = async url => reportPayload(url, () => ({...summary,totalInflow:500,totalOutflow:500,netProfit:0}));
+  ui.invalidateAuthoritativeFinance();
+  await window.DartFinance.hydrateAuthoritativeFinance();
+  const chartRange = window.DartFinance.periodRange("this_month");
+  ui.renderFinancialChart({}, chartRange, window.DartFinance.authoritativeSummary(chartRange));
+  const threeSeries = ui.state.charts.financial.data.datasets;
+  assert.equal(threeSeries.map(row => row.label).join(","),"Total Inflow,Total Outflow,Net Profit");
+  assert(threeSeries[0].data.every(value=>value===500));
+  assert(threeSeries[1].data.every(value=>value===500));
+  assert(threeSeries[2].data.every(value=>value===0));
+  assert.equal(nodes.get("dart-financial-chart").hidden,false,"break-even still displays both nonzero flows");
+  window.DartAdminApi.request = async url => reportPayload(url, () => ({...summary,totalInflow:1000,totalOutflow:1500,netProfit:-500}));
+  ui.invalidateAuthoritativeFinance(); await window.DartFinance.hydrateAuthoritativeFinance();
+  ui.renderFinancialChart({}, chartRange, window.DartFinance.authoritativeSummary(chartRange));
+  assert(ui.state.charts.financial.data.datasets[2].data.every(value=>value===-500),"losses remain negative in the three-series chart");
+  window.DartAdminApi.request = async url => reportPayload(url, () => ({...summary,totalInflow:0,totalOutflow:0,netProfit:0}));
+  ui.invalidateAuthoritativeFinance(); await window.DartFinance.hydrateAuthoritativeFinance();
+  ui.renderFinancialChart({}, chartRange, window.DartFinance.authoritativeSummary(chartRange));
+  assert.equal(nodes.get("dart-financial-chart").hidden,true,"a confirmed empty report has a distinct empty state");
+  ui.renderFinancialChart({}, chartRange, {...summary,__allowedSections:["profit"]});
+  assert.equal(nodes.get("dart-financial-chart").hidden,true,"profit-only access must not expose inflow or costs");
 
   // A previous API can fall back once; permanent bucket failures never restart on each render.
   const range = window.DartFinance.periodRange("this_month"), previous = range.previous;

@@ -72,7 +72,7 @@ describe("finance SQL snapshot", () => {
     expect(results.map((row) => row.inventoryPurchaseCashOut)).toEqual([0, 0, 0]);
     expect(results.map((row) => row.physicalItemCost)).toEqual([100.03, 30.01, 70.02]);
     expect(results.map((row) => row.grossCogs)).toEqual([50.03, 20.01, 30.02]);
-    expect(results[0]?.netProfit).toBe(173);
+    expect(results[0]).toMatchObject({totalInflow:0,totalOutflow:150.03,netProfit:-150.03});
     expect(fixture.connect).toHaveBeenCalledOnce();
     expect(fixture.release).toHaveBeenCalledOnce();
     expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(10);

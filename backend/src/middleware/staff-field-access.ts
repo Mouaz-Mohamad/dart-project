@@ -3,7 +3,7 @@ export function canReadCosts(permissions: readonly string[]): boolean {
     return ["finance.read", "finance.manage", "finance.view_cost"].some(key => permissions.includes(key));
 }
 const costFields = new Set(["cost", "costminor", "costsnapshot", "costsnapshotminor", "costtotalminor",
-    "totalcost", "totalcostminor", "unitcostminor", "acquisitioncost", "acquisitioncostminor"]);
+    "totalcost", "totalcostminor", "totaloutflow", "unitcostminor", "acquisitioncost", "acquisitioncostminor"]);
 const profitFields = new Set(["margin", "marginvscostminor", "belowcost", "profit", "netprofit", "grossprofit"]);
 const buyerFields = new Set(["clientname", "clientid", "clientcode", "phone", "phone1", "phone2", "email", "customername", "customerid"]);
 function project(value: unknown, costs: boolean, profit: boolean, buyers: boolean): unknown {

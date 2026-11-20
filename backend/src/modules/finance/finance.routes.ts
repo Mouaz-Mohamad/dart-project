@@ -120,6 +120,7 @@ export function financeSummarySection(
       deliveryCosts: summary.deliveryCosts,
       totalOperatingExpenses: summary.totalOperatingExpenses,
       totalCost: summary.totalCost,
+      totalOutflow: summary.totalOutflow,
       brandTotalCost: summary.brandTotalCost,
     };
   }
@@ -136,6 +137,7 @@ export function financeSummarySection(
   if (section === "cashflow") {
     return {
       cashIn: summary.cashIn,
+      totalInflow: summary.totalInflow,
       incomeCashIn: summary.incomeCashIn ?? 0,
       orderCashIn: summary.orderCashIn ?? summary.cashIn,
       pendingIncome: summary.pendingIncome ?? 0,
@@ -159,27 +161,25 @@ export function financeSummarySection(
 
 function financePnlExport(summary: FinanceSummary): Record<string, unknown> {
   return {
-    grossRevenue: summary.grossRevenue,
+    orderCashIn: summary.orderCashIn ?? 0,
+    incomeCashIn: summary.incomeCashIn ?? 0,
+    totalInflow: summary.totalInflow,
     refunds: -summary.refunds,
-    netRevenue: summary.netRevenue,
     grossCogs: -summary.grossCogs,
     cogsReversal: summary.cogsReversal,
     netCogs: -summary.netCogs,
-    grossProfit: summary.grossProfit,
-    otherIncome: summary.otherIncome ?? 0,
     operatingExpenses: -summary.operatingExpenses,
     codFees: -summary.codFees,
     returnCourierCosts: -summary.returnCourierCosts,
-    damageLoss: -summary.damageLoss,
-    totalCost: -summary.totalCost,
+    financingCashOut: -(summary.financingCashOut ?? 0),
+    totalOutflow: -summary.totalOutflow,
     netProfit: summary.netProfit,
-    grossMarginPercent: summary.marginApplicable ? summary.grossMargin : "N/A",
     netMarginPercent: summary.marginApplicable ? summary.margin : "N/A",
   };
 }
 
 function exportRequiredSections(section: FinanceExportSection): FinanceSection[] {
-  return section === "pnl" ? ["revenue", "cost", "profit"] : [section];
+  return section === "pnl" ? ["revenue", "cost", "profit", "cashflow"] : [section];
 }
 
 function exportData(
@@ -256,7 +256,8 @@ export function createFinanceRouter(
   })).refine((query) => Date.parse(query.end) - Date.parse(query.start) <= 3660 * 86400000,
     { message: "A Brand report cannot span more than ten years" });
   const brandPermission = (metric: BrandMetric): string[] => {
-    if (["sales", "cost"].includes(metric)) return ["finance.read", "finance.view_cashflow"];
+    if (metric === "sales") return ["finance.read", "finance.view_cashflow"];
+    if (metric === "cost") return ["finance.read", "finance.view_cost"];
     if (["models", "colors", "sizes"].includes(metric)) return ["finance.read", "finance.view_revenue"];
     if (metric === "profit") return ["finance.read", "finance.view_profit"];
     if (["damage", "stockCost"].includes(metric)) return ["finance.read", "finance.view_inventory_value"];
@@ -272,6 +273,8 @@ export function createFinanceRouter(
     ...["finance.view_revenue", "finance.view_cost"].map((permission) =>
       ((request, response, next) => request.params.metric === "profit"
         ? requireAnyPermission("finance.read", permission)(request, response, next) : next()) as RequestHandler),
+    ((request, response, next) => ["cost", "profit"].includes(String(request.params.metric))
+      ? requireAnyPermission("finance.read", "finance.view_cashflow")(request, response, next) : next()) as RequestHandler,
     async (request, response) => {
       const metric = z.enum(BRAND_METRICS).parse(request.params.metric);
       const query = brandQuerySchema.parse(request.query);
@@ -294,7 +297,7 @@ export function createFinanceRouter(
       }));
       const summaries = await finance.summaries(ranges);
       response.setHeader("Cache-Control","no-store");
-      response.json({year,currency:"EGP",basis:"sold_cost_paid_expenses",
+      response.json({year,currency:"EGP",basis:"confirmed_inflow_minus_sold_cost_and_paid_outflow",
         months:summaries.map((summary,index) => ({month:index+1,netProfit:summary.netProfit}))});
     });
 

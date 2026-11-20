@@ -33,7 +33,7 @@ function application(permissions: string[], options: { accountType?: "staff" | "
   } as AuthenticatedAccount;
   const identity = { authenticate: vi.fn().mockResolvedValue(account) } as unknown as IdentityService;
   const summaries = vi.fn(async (ranges: FinanceRange[]) => ranges.map(() => ({
-    netRevenue: 900, operatingExpenses: 40, brandTotalCost: 400, netProfit: 500,
+    totalInflow: 900, totalOutflow: 400, netRevenue: 900, operatingExpenses: 40, brandTotalCost: 400, netProfit: 500,
     brandNetProfit: 500, cashIn: 900, physicalItemCost: 360, marketing: { spend: 20 },
   } as FinanceSummary)));
   const brandDetails = vi.fn().mockResolvedValue({ rows: [], totals: { amountMinor: 0 } });
@@ -62,11 +62,13 @@ describe("combined finance report", () => {
   it("authorizes Brand metrics independently and requires both contributors before opening profit", async () => {
     for (const fixture of [
       { permissions: ["finance.view_cashflow"], metric: "sales", status: 200 },
-      { permissions: ["finance.view_cashflow"], metric: "cost", status: 200 },
+      { permissions: ["finance.view_cashflow"], metric: "cost", status: 403 },
+      { permissions: ["finance.view_cost"], metric: "cost", status: 403 },
+      { permissions: ["finance.view_cost", "finance.view_cashflow"], metric: "cost", status: 200 },
       { permissions: ["finance.view_revenue"], metric: "sales", status: 403 },
       { permissions: ["finance.view_revenue"], metric: "cost", status: 403 },
       { permissions: ["finance.view_profit"], metric: "profit", status: 403 },
-      { permissions: ["finance.view_profit", "finance.view_cost", "finance.view_revenue"], metric: "profit", status: 200 },
+      { permissions: ["finance.view_profit", "finance.view_cost", "finance.view_revenue", "finance.view_cashflow"], metric: "profit", status: 200 },
       { permissions: ["catalog.read"], metric: "stockCost", status: 403 },
       { permissions: ["catalog.read"], metric: "stockSelling", status: 200 },
       { permissions: ["finance.view_inventory_value"], metric: "damage", status: 200 },

@@ -18,15 +18,17 @@ const fixture = {
   damageValue: 80,
   returnCourierCosts: 30,
   deliveryCosts: 100,
-  totalOperatingExpenses: 160,
-  totalCost: 510,
+  totalOperatingExpenses: 250,
+  totalInflow: 900,
+  totalOutflow: 600,
+  totalCost: 600,
   grossProfit: 550,
-  netProfit: 390,
+  netProfit: 300,
   physicalItemCost: 2000,
   incrementalDamage: 20,
-  brandTotalCost: 2150,
-  brandNetProfit: -1250,
-  margin: 43.33,
+  brandTotalCost: 600,
+  brandNetProfit: 300,
+  margin: 33.33,
   grossMargin: 61.11,
   marginApplicable: true,
   deliveredOrders: 2,
@@ -72,8 +74,8 @@ describe("finance field-level permissions", () => {
 
   it("returns cost metrics including Owner Total Cost without leaking revenue", () => {
     const section = financeSummarySection(fixture, "cost");
-    expect(section.totalCost).toBe(510);
-    expect(section.brandTotalCost).toBe(2150);
+    expect(section.totalCost).toBe(600);
+    expect(section.brandTotalCost).toBe(600);
     expect(section).not.toHaveProperty("netRevenue");
     expect(section).not.toHaveProperty("netProfit");
   });
@@ -81,6 +83,7 @@ describe("finance field-level permissions", () => {
   it("keeps cashflow and inventory values in separate sections", () => {
     expect(financeSummarySection(fixture, "cashflow")).toEqual({
       cashIn: 900,
+      totalInflow: 900,
       incomeCashIn: 0,
       orderCashIn: 900,
       pendingIncome: 0,
@@ -103,7 +106,7 @@ describe("finance field-level permissions", () => {
       new URL("../src/modules/finance/finance.routes.ts", import.meta.url),
       "utf8",
     );
-    expect(source).toContain('section === "pnl" ? ["revenue", "cost", "profit"]');
+    expect(source).toContain('section === "pnl" ? ["revenue", "cost", "profit", "cashflow"]');
     expect(source).toContain('requirePermission("finance.export")');
     expect(source).toContain('requiredViews.every((permission) => permissions.includes(permission))');
   });
