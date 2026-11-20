@@ -5,18 +5,18 @@
   const attributes = ["placeholder", "title", "aria-label", "data-info-title", "data-info-text"];
   const excluded = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE", "PRE", "OPTIONGROUP"]);
   const patterns = [
-    [/^(\\d+) selected$/i, (_, count) => count + " محدد"],
-    [/^(\\d+) active$/i, (_, count) => count + " نشط"],
-    [/^(\\d+) shipments$/i, (_, count) => count + " شحنة"],
-    [/^(\\d+) sold item\\(s\\)$/i, (_, count) => count + " قطعة مباعة"],
-    [/^(\\d+) matching setting\\(s\\) across all categories$/i, (_, count) => count + " إعداد مطابق في كل الأقسام"],
-    [/^(\\d+) \\/ (\\d+) selected$/i, (_, count, max) => count + " من " + max + " محدد"]
+    [/^(\d+) selected$/i, (_, count) => count + " محدد"],
+    [/^(\d+) active$/i, (_, count) => count + " نشط"],
+    [/^(\d+) shipments$/i, (_, count) => count + " شحنة"],
+    [/^(\d+) sold item\(s\)$/i, (_, count) => count + " قطعة مباعة"],
+    [/^(\d+) matching setting\(s\) across all categories$/i, (_, count) => count + " إعداد مطابق في كل الأقسام"],
+    [/^(\d+) \/ (\d+) selected$/i, (_, count, max) => count + " من " + max + " محدد"]
   ];
   function translated(value) {
     if (!value || value.length > 360) return null;
     const trimmed = value.trim();
     if (!trimmed || !/[A-Za-z]/.test(trimmed)) return null;
-    const fixed = translations.get(trimmed) || translations.get(trimmed.replace(/\\s+/g, " "));
+    const fixed = translations.get(trimmed) || translations.get(trimmed.replace(/\s+/g, " "));
     if (fixed) return fixed;
     for (const [pattern, replace] of patterns) {
       if (pattern.test(trimmed)) return trimmed.replace(pattern, replace);
@@ -43,8 +43,8 @@
     const original = node.nodeValue;
     const next = translated(original);
     if (!next) return;
-    const before = original.match(/^\\s*/)[0];
-    const after = original.match(/\\s*$/)[0];
+    const before = original.match(/^\s*/)[0];
+    const after = original.match(/\s*$/)[0];
     const replacement = before + next + after;
     if (replacement !== original) node.nodeValue = replacement;
   }
