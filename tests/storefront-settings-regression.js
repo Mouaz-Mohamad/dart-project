@@ -448,7 +448,7 @@ const server = http.createServer(async (request, response) => {
   await dashboard.locator('#settings-promotion-message').fill('كمّل اللوك واستفيد');
   await dashboard.locator('#settings-promotion-status').selectOption('Active');
   await dashboard.locator('#save-promotion').click();
-  await dashboard.waitForFunction(() => document.getElementById('settings-promotion-status-message').textContent.includes('Campaign created'));
+  await dashboard.waitForFunction(() => document.getElementById('settings-promotion-status-message').textContent.includes('تم إنشاء الحملة'));
   assert.equal(promotionWrites.length,1);
   assert.deepEqual(Object.fromEntries(['discountKind','discountAmountMinor','discountPercent','distinctModels','automatic','minQuantity','marketingText'].map(key => [key,promotionWrites[0][key]])), {
     discountKind:'fixed',discountAmountMinor:15025,discountPercent:0,distinctModels:true,automatic:true,minQuantity:3,marketingText:'كمّل اللوك واستفيد',
