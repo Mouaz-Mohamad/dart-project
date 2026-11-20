@@ -1,6 +1,6 @@
 # Navbar and smart shopping bar — 2026-11-21
 
-The shared header stays visible near the top, hides on downward scrolling and returns immediately on upward movement anywhere in the document. Keyboard focus and an open Menu keep it visible. Horizontal clipping uses `overflow-x:clip` only after installation so the body does not trap sticky positioning.
+The shared header stays visible near the top, hides on downward scrolling and returns immediately on upward movement anywhere in the document. Keyboard focus and an open Menu keep it visible. Clipping uses `overflow-x:clip` on the body and `overflow:clip` on the actual `.mother` page shell after installation, so neither ancestor traps sticky positioning. The browser fixture includes that production shell; a bare-header fixture missed its original `overflow:hidden` interaction during the first release check.
 
 Successful additions call one shared bar through the deferred feedback loader. The whole message links to the canonical cart. On the cart page it opens checkout without reloading the customer's address. Confirmation lasts six seconds by default and pauses during focus/hover. Server-verified offer progress can remain after confirmation; Close dismisses it until cart/session changes. Late responses cannot restore another customer's message. Errors leave only the successful-addition confirmation, never an invented benefit.
 

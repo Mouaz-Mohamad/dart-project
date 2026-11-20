@@ -191,6 +191,7 @@ header {
 
 /* Keep horizontal clipping without creating an ancestor scroll container. */
 body.dart-scroll-header { overflow-x: clip; }
+body.dart-scroll-header > .mother { overflow: clip; }
 
 .menu-open #header-container {
   transform: none;

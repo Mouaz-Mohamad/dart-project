@@ -8,8 +8,9 @@ const header = fs.readFileSync(path.join(root, "sections/Nav-Bar.html"), "utf8")
 const fixture = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/CSS/main.css"><link rel="stylesheet" href="/CSS/base.css"><link rel="stylesheet" href="/CSS/responsive.css">
   <link data-dart-shopping-bar rel="prefetch" href="/Js/dart-shopping-bar.js" as="script">
-  <script src="/Js/dart-navigation.min.js" defer></script></head><body><div id="header-container">${header}</div>
+  <script src="/Js/dart-navigation.min.js" defer></script></head><body class="dja-flexdir"><div class="mother"><header id="header-container">${header}</header>
   <main style="height:5000px;padding:20px"><button id="preview-add">Add preview product</button><p>Isolated shopping feedback fixture</p></main>
+  </div>
   <script>
     let fixtureCart=[];
     window.DartState={read:()=>fixtureCart};
@@ -38,6 +39,7 @@ const server = http.createServer((req, res) => {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
       await page.locator("#preview-add").click();
       const bar = page.locator("#cartBanner"); await bar.waitFor({ state: "visible" });
+      assert.equal(await page.locator(".mother").evaluate(el => getComputedStyle(el).overflow), "clip", "the production shell clips without trapping sticky positioning");
       assert.match(await bar.innerText(), /هودي Dart/); assert.match(await bar.innerText(), /فاضلك 1/);
       assert.equal(await bar.locator("a").getAttribute("href"), "/cart-checkout.html");
       assert.equal(await bar.locator("progress").evaluate(el => el.value), 2);
