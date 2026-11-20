@@ -26,7 +26,8 @@
   function isExcluded(node) {
     const parent = node.nodeType === 3 ? node.parentElement : node;
     if (!parent || !parent.closest) return false;
-    return Boolean(parent.closest('[contenteditable="true"], [data-ar-ignore], script, style, noscript, pre, code, svg, textarea'));
+    // Hero typing previews display merchant-authored copy, not interface labels.
+    return Boolean(parent.closest('[contenteditable="true"], [data-ar-ignore], .dart-typing-preview, script, style, noscript, pre, code, svg, textarea'));
   }
   function translateElement(element) {
     // Textarea content is user input, but its placeholder is a UI label.

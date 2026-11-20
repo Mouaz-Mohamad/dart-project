@@ -24,7 +24,11 @@ function element(tag, attributes = {}, childNodes = []) {
     hasAttribute(name) { return Object.hasOwn(this.attributes, name); },
     getAttribute(name) { return this.attributes[name]; },
     setAttribute(name, value) { this.attributes[name] = value; },
-    closest() { return this.tagName === "CODE" ? this : null; },
+    closest(selector) {
+      if (this.tagName === "CODE") return this;
+      if (selector.includes(".dart-typing-preview") && this.attributes.class?.split(/\s+/).includes("dart-typing-preview")) return this;
+      return this.parentElement?.closest(selector) || null;
+    },
     contains(target) {
       return this.childNodes.some((child) => child === target || child.contains?.(target));
     }
@@ -38,8 +42,9 @@ const input = element("input", { placeholder: "Code PIC", name: "itemCode", valu
 const area = element("textarea", { placeholder: "Full address written on the ID", value: "Cairo, 10 Street" });
 const action = element("button", { "aria-label": "Confirm Dispatch" }, [text("Confirm Dispatch")]);
 const retained = element("strong", {}, [text("Dart Card")]);
+const preview = element("span", { class: "dart-typing-preview" }, [text("Today")]);
 const code = element("code", {}, [text("Code Model")]);
-const body = element("body", {}, [title, input, area, action, retained, code]);
+const body = element("body", {}, [title, input, area, action, retained, code, preview]);
 let observerCallback;
 let observerOptions;
 const document = {
@@ -81,6 +86,7 @@ assert.equal(action.getAttribute("aria-label"), "تأكيد خروج الأور�
 assert.equal(action.childNodes[0].nodeValue, "تأكيد خروج الأوردر للتوصيل");
 assert.equal(retained.childNodes[0].nodeValue, "Dart Card");
 assert.equal(code.childNodes[0].nodeValue, "Code Model");
+assert.equal(preview.childNodes[0].nodeValue, "Today", "Merchant-authored text must remain exactly as entered");
 assert.ok(observerOptions.characterData && observerOptions.childList);
 const appended = element("span", {}, [text("3 selected")]);
 appended.parentElement = body;
@@ -92,6 +98,11 @@ changed.parentElement = appended;
 appended.childNodes[0] = changed;
 observerCallback([{ type: "characterData", target: changed }]);
 assert.equal(changed.nodeValue, "كود الموديل");
+const changedPreview = text("Today");
+changedPreview.parentElement = preview;
+preview.childNodes[0] = changedPreview;
+observerCallback([{ type: "characterData", target: changedPreview }]);
+assert.equal(changedPreview.nodeValue, "Today", "Dynamic merchant text must remain untouched");
 for (const [name, html] of [["dashboard", dashboard], ["courier", courier]]) {
   assert.match(html, /<html lang="ar"/, name + " must declare Arabic");
   assert.match(html, /dart-admin-ar\.js/, name + " must load Arabic labels");
