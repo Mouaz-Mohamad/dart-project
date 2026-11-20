@@ -29,7 +29,8 @@
     return Boolean(parent.closest('[contenteditable="true"], [data-ar-ignore], script, style, noscript, pre, code, svg, textarea'));
   }
   function translateElement(element) {
-    if (!element || isExcluded(element)) return;
+    // Textarea content is user input, but its placeholder is a UI label.
+    if (!element || (isExcluded(element) && element.tagName !== "TEXTAREA")) return;
     for (const attribute of attributes) {
       if (!element.hasAttribute(attribute)) continue;
       const value = element.getAttribute(attribute);
