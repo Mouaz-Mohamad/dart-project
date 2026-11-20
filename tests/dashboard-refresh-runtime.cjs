@@ -3,6 +3,14 @@
 // Exercise the actual dashboard scheduler with several changes in the same frame.
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm");
 const source = fs.readFileSync("Eye/dart.js", "utf8");
+// Keep chart dependencies blocking only after the dashboard HTML is parsed,
+// and loaded before the dashboard runtime that constructs charts.
+const html = fs.readFileSync("Eye/Dart Eye.html", "utf8");
+const headEnd = html.indexOf("</head>");
+const apex = html.indexOf('src="https://cdn.jsdelivr.net/npm/apexcharts"');
+const charts = html.indexOf('src="https://cdn.jsdelivr.net/npm/chart.js"');
+const appJs = html.indexOf('src="dart.js?');
+assert.ok(apex > headEnd && charts > headEnd && appJs > charts, "chart libraries must not block the initial HTML head, but precede dashboard runtime");
 const start = source.indexOf("// BEGIN Scoped dashboard refresh");
 const end = source.indexOf("// END Scoped dashboard refresh", start);
 const frames = [], renders = [], events = new Map();
