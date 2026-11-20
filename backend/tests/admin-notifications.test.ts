@@ -18,8 +18,12 @@ import type { IdentityService } from "../src/modules/identity/identity.service.j
 import type { AuthenticatedAccount } from "../src/modules/identity/identity.types.js";
 import type { WebPushProvider } from "../src/modules/notifications/web-push-provider.js";
 const curve=createECDH("prime256v1");curve.generateKeys();
+// ECDH can omit leading zeroes: normalize the *test* private key to exactly 32 bytes.
+const privateKey=curve.getPrivateKey();
+const fixedPrivateKey=Buffer.alloc(32);
+privateKey.copy(fixedPrivateKey,32-privateKey.length);
 const config=loadConfig({NODE_ENV:"test",DATABASE_URL:"postgres://synthetic.test/dart",RATE_LIMIT_MAX:"1000",
-  WEB_PUSH_VAPID_PUBLIC_KEY:curve.getPublicKey().toString("base64url"),WEB_PUSH_VAPID_PRIVATE_KEY:curve.getPrivateKey().toString("base64url"),WEB_PUSH_VAPID_SUBJECT:"https://www.dartofficial.com/"});
+  WEB_PUSH_VAPID_PUBLIC_KEY:curve.getPublicKey().toString("base64url"),WEB_PUSH_VAPID_PRIVATE_KEY:fixedPrivateKey.toString("base64url"),WEB_PUSH_VAPID_SUBJECT:"https://www.dartofficial.com/"});
 const permissions=["notifications.read","orders.read","returns.read","reviews.read"];
 const csrf="synthetic-staff-notifications",cookie=`dart_session_staff=${randomUUID()}.${"x".repeat(43)}`;
 function browser(){const key=createECDH("prime256v1");key.generateKeys();return {endpoint:`https://fcm.googleapis.com/fcm/send/${randomUUID()}`,expirationTime:null,keys:{p256dh:key.getPublicKey().toString("base64url"),auth:Buffer.alloc(16,5).toString("base64url")}};}
