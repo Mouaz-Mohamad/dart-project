@@ -1,0 +1,33 @@
+/* Arabic wording and typography for the internal dashboard and courier portal.
+   Keep the existing LTR positioning of charts/maps and the established dashboard grids. */
+html[lang="ar"] body {
+  font-family: "Cairo", "Readex Pro", "Inter", sans-serif;
+}
+html[lang="ar"] :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+html[lang="ar"] .dashboard-section :is(h1,h2,h3,h4,h5,h6,p,label,summary,th),
+html[lang="ar"] .dart-admin-auth :is(h1,h2,p,label,button),
+html[lang="ar"] #dart-sidebar-navigation :is(.dart-sidebar-heading,.dart-sidebar-label) {
+  unicode-bidi: plaintext;
+}
+html[lang="ar"] #repAuthView :is(.dart-rep-auth-form,.dart-rep-auth-switch),
+html[lang="ar"] #repDashboardView .dart-rep-dashboard-identity {
+  direction: rtl;
+  text-align: right;
+}
+html[lang="ar"] #repAuthView :is(input,textarea) {
+  text-align: right;
+}
+html[lang="ar"] #repAuthView input[type="email"],
+html[lang="ar"] #repAuthView input[inputmode="numeric"],
+html[lang="ar"] #repAuthView input[type="tel"] {
+  direction: ltr;
+  text-align: right;
+}
+html[lang="ar"] #repDashboardView .dart-rep-dashboard-head {
+  direction: rtl;
+}
+html[lang="ar"] #repDashboardView #repIdentity {
+  unicode-bidi: plaintext;
+}
