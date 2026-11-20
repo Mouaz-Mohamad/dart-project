@@ -1,7 +1,7 @@
 /* Dart internal UI Arabic labels. Business values and API identifiers are never changed. */
 (function () {
   "use strict";
-  const translations = new Map([["Total Inflow","إجمالي الوارد"],["Total Outflow","إجمالي الصادر"],["Net Profit","صافي الربح"],["Code PIC","كود القطعة"],["Code Pic","كود القطعة"],["Code Model","كود الموديل"],["Model Code","كود الموديل"],["Confirm Dispatch","تأكيد خروج الأوردر للتوصيل"],["Full address written on the ID","العنوان كامل زي البطاقة"]]);
+  const translations = new Map([["Total Inflow","إجمالي الوارد"],["Total Outflow","إجمالي الصادر"],["Net Profit","صافي الربح"],["Code PIC","كود القطعة"],["Code Pic","كود القطعة"],["Code Model","كود الموديل"],["Model Code","كود الموديل"],["Confirm Dispatch","تأكيد خروج الأوردر للتوصيل"],["Full address written on the ID","العنوان كامل زي البطاقة"],["Active","نشط"],["Accepted","مقبول"],["New","جديد"]]);
   const attributes = ["placeholder", "title", "aria-label", "data-info-title", "data-info-text"];
   const excluded = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE", "PRE", "OPTIONGROUP"]);
   const patterns = [
