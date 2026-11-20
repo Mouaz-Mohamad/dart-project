@@ -336,7 +336,8 @@ const server = http.createServer((request, response) => {
     control?.click();
   });
   assert.equal(await dashboard.locator("#settings-content").getAttribute("data-active-settings-tab"), "general");
-  await dashboard.locator('#settings-search').fill('Order verification policy');
+  await dashboard.waitForFunction(() => document.documentElement.dataset.dartArabicReady === 'true');
+   await dashboard.locator('#settings-search').fill('سياسة التحقق من الأوردرات');
   const policyResult = dashboard.locator('[data-settings-result="settings-cod-risk-card"]');
   assert.equal(await policyResult.isVisible(),true,'cross-category search exposes a navigation result');
   assert.equal(await dashboard.locator('[data-settings-result="settings-commerce-card"]').count(),0);
@@ -677,8 +678,8 @@ const server = http.createServer((request, response) => {
   await dashboard.evaluate(() => window.__orderCommands[0]);
   assert.equal(await rowA.getAttribute("aria-busy"), "false");
   await dashboard.waitForFunction(() =>
-    document.querySelector('#orders-container [data-id="order-b"] .status-pill')?.textContent === 'Accepted');
-  assert.equal(await rowB.locator(".status-pill").textContent(), "Accepted");
+    document.querySelector('#orders-container [data-id="order-b"] .status-pill')?.textContent === 'مقبول');
+  assert.equal(await rowB.locator(".status-pill").textContent(), "مقبول");
   assert.equal(await dashboard.evaluate(() => window.DartOrdersApi.serverVersion()), 4);
   const filters=dashboard.locator('#orders .filter-bar');
   await filters.locator('select[data-filter-key="date"]').selectOption('today');
@@ -712,7 +713,7 @@ const server = http.createServer((request, response) => {
   for (const width of [390, 1366]) {
     await dashboard.setViewportSize({width, height:900});
     await dashboard.waitForSelector('#orders-container [data-id="order-a"] .dart-record-fields', {state:'visible'});
-    assert.match(await rowA.locator('.dart-record-fields').textContent(), /Accepted/);
+    assert.match(await rowA.locator('.dart-record-fields').textContent(), /مقبول/);
     assert.equal(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `no dashboard overflow at ${width}px`);
     const output = path.join(root, '..', 'checks');
     fs.mkdirSync(output, {recursive:true});
