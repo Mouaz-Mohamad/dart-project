@@ -33,7 +33,8 @@ describe("catalogue scale HTTP boundaries", () => {
     expect((await request(app).get("/api/v1/catalog")).status).toBe(200);
     expect(service.publicCatalog).toHaveBeenLastCalledWith(undefined);
     const response = await request(app).get("/api/v1/catalog").query({ page: 2, limit: 50, q: " shirt ", sort: "price-low" });
-    expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("private, no-cache, max-age=0, must-revalidate");
+    expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=3, stale-while-revalidate=3");
     expect(service.publicCatalog).toHaveBeenLastCalledWith({ page: 2, limit: 50, q: "shirt", sort: "price-low" });
   });
   it("revalidates cached public bytes against current stock and transfers only changes", async () => {
@@ -45,6 +46,7 @@ describe("catalogue scale HTTP boundaries", () => {
     expect(unchanged.status).toBe(304);
     expect(unchanged.text).toBe("");
     expect(unchanged.headers["cache-control"]).toContain("must-revalidate");
+    expect(unchanged.headers["vercel-cdn-cache-control"]).toContain("s-maxage=3");
     expect(service.publicCatalog).toHaveBeenCalledTimes(2);
     // Stock can change independently of a model edit: validate the whole public
     // representation, rather than trusting a version-only conditional response.

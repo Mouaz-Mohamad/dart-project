@@ -76,9 +76,12 @@ export function createCatalogRouter(
     const state = await catalog.publicCatalog(
       ["page", "limit", "q", "category", "sort"].some((key) => key in request.query) ? pageSchema.parse(request.query) : undefined,
     );
-    // Only the public projection may be kept in the browser HTTP cache. Always
-    // read authoritative stock before Express validates the response ETag (304).
-    response.setHeader("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+    // The response contains only public catalog data; no sessions or pricing
+    // entitlements. Cache briefly at the Vercel edge to avoid one expensive
+    // inventory snapshot per visitor. Browser always revalidates; reservations
+    // and checkout still validate the authoritative current stock on the server.
+    response.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    response.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=3, stale-while-revalidate=3");
     response.removeHeader("Pragma");
     response.status(200).json(state);
   });
