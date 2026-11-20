@@ -151,6 +151,7 @@ jobs:
           node tests/release-ci-gate.cjs
           node tests/birthday-welcome-runtime.cjs
           node tests/admin-notifications-runtime.cjs
+          node tests/admin-ar-localization.test.cjs
           node tests/settings-accordion-contract.cjs
           node tests/test-inventory-contract.cjs
 
