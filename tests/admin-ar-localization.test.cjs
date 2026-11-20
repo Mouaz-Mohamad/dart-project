@@ -30,10 +30,11 @@ function element(tag, attributes = {}, childNodes = []) {
 
 const title = element("h2", {}, [text("Total Inflow")]);
 const input = element("input", { placeholder: "Code PIC", name: "itemCode", value: "ABC-001" });
+const area = element("textarea", { placeholder: "Full address written on the ID", value: "Cairo, 10 Street" });
 const action = element("button", { "aria-label": "Confirm Dispatch" }, [text("Confirm Dispatch")]);
 const retained = element("strong", {}, [text("Dart Card")]);
 const code = element("code", {}, [text("Code Model")]);
-const body = element("body", {}, [title, input, action, retained, code]);
+const body = element("body", {}, [title, input, area, action, retained, code]);
 let observerCallback;
 let observerOptions;
 const document = {
@@ -69,6 +70,8 @@ assert.equal(title.childNodes[0].nodeValue, "إجمالي الوارد");
 assert.equal(input.getAttribute("placeholder"), "كود القطعة");
 assert.equal(input.getAttribute("name"), "itemCode");
 assert.equal(input.getAttribute("value"), "ABC-001");
+assert.equal(area.getAttribute("placeholder"), "العنوان كامل زي البطاقة");
+assert.equal(area.getAttribute("value"), "Cairo, 10 Street");
 assert.equal(action.getAttribute("aria-label"), "تأكيد خروج الأوردر للتوصيل");
 assert.equal(action.childNodes[0].nodeValue, "تأكيد خروج الأوردر للتوصيل");
 assert.equal(retained.childNodes[0].nodeValue, "Dart Card");
