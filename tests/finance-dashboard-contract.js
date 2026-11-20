@@ -133,7 +133,7 @@ assert(!finance.includes("returnCourierCosts + deliveryCosts"), "Courier allocat
 assert(html.includes('id="settings-delivery-cost"'), "Settings must expose the per-order courier fee used for future order snapshots.");
 assert(html.includes("Courier fee per order"), "Settings must clearly label the courier fee as per-order.");
 assert(finance.includes("inStockCost"), "Brand must calculate the filtered In Stock Cost Value.");
-assert(finance.includes("Total Outflow") && finance.includes("current.totalOutflow"), "Finance must display sold-piece cost plus paid expenses as Total Outflow.");
+assert(finance.includes("Total Outflow") && finance.includes("current.totalOutflow"), "Finance must display all acquired item costs plus paid expenses as Total Outflow.");
 assert(finance.includes("Total Inflow minus Total Outflow"), "Brand must explain the confirmed net-profit equation.");
 assert(finance.includes("Inventory Investment"), "Finance overview must expose inventory investment separately from P&L COGS.");
 assert(finance.includes("Inventory Acquisition"), "Finance must support paid inventory acquisition as a cash-flow-only category without double-counting P&L.");

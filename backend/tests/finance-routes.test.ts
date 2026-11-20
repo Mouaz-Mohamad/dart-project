@@ -86,6 +86,7 @@ describe("finance field-level permissions", () => {
       totalInflow: 900,
       incomeCashIn: 0,
       orderCashIn: 900,
+      orderInflow: 0,
       pendingIncome: 0,
       financingCashOut: 0,
       cashOut: 250,

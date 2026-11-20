@@ -10,7 +10,7 @@ describe("Brand detail SQL", () => {
     try {
       await db.exec(`
         CREATE TABLE orders(id text PRIMARY KEY,order_code text,customer_user_id text,final_minor bigint,delivery_cost_minor bigint,
-          payment_method text,payment_status text,amount_paid_minor bigint,amount_refunded_minor bigint,delivered_at timestamptz,updated_at timestamptz,status text);
+          payment_method text,payment_status text,amount_paid_minor bigint,amount_refunded_minor bigint,delivered_at timestamptz,updated_at timestamptz,status text,legacy jsonb DEFAULT '{}');
         CREATE TABLE order_items(id text,order_id text,item_code text,model_id text,model_name text,color text,size text,cost_snapshot_minor bigint);
         CREATE TABLE catalog_models(model_id text,name text,selling_minor bigint,cost_minor bigint,discount_percent numeric,color_options jsonb,size_options jsonb,is_deleted boolean DEFAULT false);
         CREATE TABLE inventory_items(item_code text,cost_snapshot_minor bigint,model_id text,color text,size text,status text,active boolean,is_archived boolean DEFAULT false,is_deleted boolean DEFAULT false,created_at timestamptz);
@@ -20,7 +20,7 @@ describe("Brand detail SQL", () => {
         CREATE TABLE finance_records(domain text,record_id text,position int,payload jsonb);
         CREATE TABLE waitlist_entries(model_id text,desired_color text,size text,status text);
         CREATE TABLE set_waiting_entries(selections jsonb,status text);
-        INSERT INTO orders VALUES ('o1','O1','c1',50001,0,'COD','Paid',50001,0,'2026-10-10T12:00Z','2026-10-10T12:00Z','Delivered');
+        INSERT INTO orders VALUES ('o1','O1','c1',50001,0,'COD','Paid',50001,0,'2026-10-10T12:00Z','2026-10-10T12:00Z','Delivered','{}');
         INSERT INTO order_items VALUES ('l1','o1','sold','M1','Hoodie','Black','M',12001);
         INSERT INTO catalog_models(model_id,name,selling_minor,cost_minor,discount_percent,color_options,size_options)
           VALUES ('M1','Hoodie',50001,12001,15,'["Black"]','["M"]');
@@ -48,13 +48,13 @@ describe("Brand detail SQL", () => {
         const ledger = report as { rows: Array<{ lane: string; amountMinor: number }>; totals: { amountMinor: number } };
         expect(ledger.rows.reduce((sum, row) => sum + (metric === "profit" && row.lane === "outgoing" ? -row.amountMinor : row.amountMinor), 0)).toBe(ledger.totals.amountMinor);
         if (metric !== "profit") expect(ledger.totals).not.toHaveProperty("incomeMinor");
-        else expect(ledger.totals).toMatchObject({amountMinor:-503,incomeMinor:22500,costMinor:23003});
+        else expect(ledger.totals).toMatchObject({amountMinor:14494,incomeMinor:52501,costMinor:38007});
         if (metric === "cost") expect(ledger.rows.find(row => (row as {id?:string}).id === "expense:e1")).toMatchObject({reference:"فاتورة التصوير"});
       }
       const overview = await service.brandDetails("overview", "2026-10-01", "2026-10-30", 1, 100, visibility);
       expect(overview).toMatchObject({ totals: { pieces: 2, models: 1, costMinor: 27005, sellingMinor: 85002 }, top: { models: { waiting: 3, total: 4, sold: 0 } } });
       const limited = await service.brandDetails("cost", "2026-10-01", "2026-10-30", 2, 1, visibility);
-      expect(limited).toMatchObject({ page: 2, limit: 1, total: 3 });
+      expect(limited).toMatchObject({ page: 2, limit: 1, total: 4 });
       expect((limited as { rows: unknown[] }).rows).toHaveLength(1);
       const restricted = await service.brandDetails("stockSelling", "2026-10-01", "2026-10-30", 1, 100, { costs: false, waiting: false, sales: false });
       expect(JSON.stringify(restricted)).not.toContain('"costMinor"');

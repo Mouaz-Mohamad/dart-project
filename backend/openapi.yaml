@@ -1004,14 +1004,14 @@ paths:
   /admin/finance/net-profit-series:
     get:
       tags: [Finance]
-      summary: Read twelve calendar-month net profits using sold-piece cost and confirmed paid operating expenses.
+      summary: Read twelve calendar-month results using collected delivered orders, received income, all acquired item costs and confirmed paid expenses.
       operationId: getNetProfitSeries
       security: [{ sessionCookie: [] }]
-      description: Requires Staff MFA and finance.read or finance.view_profit. All months share one PostgreSQL snapshot. Unsold inventory and unpaid expenses do not reduce net profit. Returns no cost or revenue contributors.
+      description: Requires Staff MFA and finance.read or finance.view_profit. All months share one PostgreSQL snapshot. All physical items acquired in the period enter outflow once, including unsold stock. Unpaid expenses remain excluded. Returns no cost or revenue contributors.
       parameters:
         - { in: query, name: year, required: true, schema: { type: integer, minimum: 1970, maximum: 9998 } }
       responses:
-        "200": { description: Year, EGP currency, confirmed_inflow_minus_sold_cost_and_paid_outflow basis, and twelve ordered month/netProfit entries. Negative profits are retained. }
+        "200": { description: Year, EGP currency, collected_orders_and_received_income_minus_acquired_items_and_paid_outflow basis, and twelve ordered month/netProfit entries. Negative profits are retained. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationError" }

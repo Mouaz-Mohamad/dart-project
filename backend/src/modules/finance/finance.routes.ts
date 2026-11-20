@@ -113,6 +113,7 @@ export function financeSummarySection(
       grossCogs: summary.grossCogs,
       cogsReversal: summary.cogsReversal,
       netCogs: summary.netCogs,
+      physicalItemCost: summary.physicalItemCost,
       operatingExpenses: summary.operatingExpenses,
       codFees: summary.codFees,
       damageLoss: summary.damageLoss,
@@ -140,6 +141,7 @@ export function financeSummarySection(
       totalInflow: summary.totalInflow,
       incomeCashIn: summary.incomeCashIn ?? 0,
       orderCashIn: summary.orderCashIn ?? summary.cashIn,
+      orderInflow: summary.orderInflow ?? 0,
       pendingIncome: summary.pendingIncome ?? 0,
       financingCashOut: summary.financingCashOut ?? 0,
       cashOut: summary.cashOut,
@@ -161,13 +163,11 @@ export function financeSummarySection(
 
 function financePnlExport(summary: FinanceSummary): Record<string, unknown> {
   return {
-    orderCashIn: summary.orderCashIn ?? 0,
+    orderInflow: summary.orderInflow ?? 0,
     incomeCashIn: summary.incomeCashIn ?? 0,
     totalInflow: summary.totalInflow,
     refunds: -summary.refunds,
-    grossCogs: -summary.grossCogs,
-    cogsReversal: summary.cogsReversal,
-    netCogs: -summary.netCogs,
+    physicalItemCost: -summary.physicalItemCost,
     operatingExpenses: -summary.operatingExpenses,
     codFees: -summary.codFees,
     returnCourierCosts: -summary.returnCourierCosts,
@@ -297,7 +297,7 @@ export function createFinanceRouter(
       }));
       const summaries = await finance.summaries(ranges);
       response.setHeader("Cache-Control","no-store");
-      response.json({year,currency:"EGP",basis:"confirmed_inflow_minus_sold_cost_and_paid_outflow",
+      response.json({year,currency:"EGP",basis:"collected_orders_and_received_income_minus_acquired_items_and_paid_outflow",
         months:summaries.map((summary,index) => ({month:index+1,netProfit:summary.netProfit}))});
     });
 

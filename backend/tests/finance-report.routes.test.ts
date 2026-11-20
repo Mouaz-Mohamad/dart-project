@@ -135,7 +135,7 @@ describe("combined finance report", () => {
     expect(response.body.allowedSections).toEqual(["cost", "profit"]);
     expect(response.body.periods[0].summary).toMatchObject({ operatingExpenses: 40, netProfit: 500 });
     expect(response.body.periods[0].summary).not.toHaveProperty("netRevenue");
-    expect(response.body.periods[0].summary).not.toHaveProperty("physicalItemCost");
+    expect(response.body.periods[0].summary).toHaveProperty("physicalItemCost",360);
   });
 
   it("denies missing sessions, unrelated permissions, customer accounts and unsatisfied MFA before reading finance", async () => {

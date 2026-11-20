@@ -10,9 +10,25 @@ function range(start, end) {
 }
 
 function baseData(overrides = {}) {
+  // Complete synthetic inventory/payment records: Brand totals must not infer
+  // purchases from COGS or customer payments from a courier-transfer fixture.
+  const orders = (overrides.orders || []).map(order => ({
+    amountPaid: order.paymentStatus === "Unpaid" ? 0 : order.finalAmount ??
+      ((order.priceSnapshot || []).reduce((sum,line) => sum + line.finalUnitPrice * (line.qty || 1),0) - (order.orderLevelDiscountAmount || 0)), ...order,
+  }));
+  const items = new Map();
+  for (const order of orders) for (const line of order.priceSnapshot || []) {
+    items.set(line.itemCode, { itemCode: line.itemCode, modelId: line.modelCode,
+      costSnapshot: line.costSnapshot, status: "Sold", createdAt: order.deliveredAt });
+  }
+  for (const row of overrides.damage || []) if (!items.has(row.itemCode)) {
+    items.set(row.itemCode, { ...row, createdAt: row.inspectedAt || row.date });
+  }
   return {
     orders: [], returns: [], items: [], models: [], customers: [], reviews: [], damage: [], expenses: [], budgets: [], invoices: [], goals: [], marketing: [], settlements: [],
     ...overrides,
+    orders,
+    items: overrides.items || [...items.values()],
   };
 }
 
@@ -28,7 +44,7 @@ const deliveredOrder = {
   status: "Delivered",
   deliveredAt: "2026-09-02T10:00:00+03:00",
   paymentMethod: "Cash on Delivery",
-  paymentStatus: "Unpaid",
+  paymentStatus: "Paid",
   amountRefunded: 0,
   deliveryCost: 0,
   priceSnapshot: [{ itemCode: "I-1", modelCode: "M-1", qty: 1, finalUnitPrice: 1000, costSnapshot: 400 }],
@@ -72,7 +88,7 @@ assert.strictEqual(returnedSummary.netRevenue, 0);
 assert.strictEqual(returnedSummary.netCogs, 0, "A Good return must reverse its immutable COGS snapshot.");
 assert.strictEqual(returnedSummary.soldUnits, 0, "Net units sold must subtract completed returns.");
 assert.strictEqual(returnedSummary.operatingExpenses, 0, "Unpaid expenses stay pending until payment confirmation.");
-assert.strictEqual(returnedSummary.netProfit, 0);
+assert.strictEqual(returnedSummary.netProfit, -400, "Refunds do not erase an already acquired piece's cost.");
 assert.strictEqual(returnedSummary.cashOut, 1000, "The completed customer refund must be a cash outflow; the unpaid expense must not add another outflow.");
 
 const laterReturnData = baseData({
@@ -83,13 +99,13 @@ const laterReturnSummary = finance.calculateSummary(laterReturnData, range("2026
 assert.strictEqual(laterReturnSummary.grossRevenue, 0, "An older delivery must not be moved into the return period.");
 assert.strictEqual(laterReturnSummary.netRevenue, -1000, "A later-period refund must reduce that later period's revenue.");
 assert.strictEqual(laterReturnSummary.netCogs, -400, "A later Good return must reverse COGS in its actual return period.");
-assert.strictEqual(laterReturnSummary.netProfit, -600);
+assert.strictEqual(laterReturnSummary.netProfit, -1000);
 assert.strictEqual(laterReturnSummary.soldUnits, -1, "A return-only period must show negative net units instead of clamping to zero.");
 assert.strictEqual(laterReturnSummary.margin, 0, "A return-adjustment period must not display a misleading positive margin.");
 assert.strictEqual(laterReturnSummary.cashOut, 1000, "A later refund must leave cash once and must not be double-deducted from COD inflow.");
 
 const cashData = baseData({
-  orders: [{ ...deliveredOrder, paymentStatus: "Unpaid" }],
+  orders: [deliveredOrder],
   expenses: [{ id: "E-2", date: "2026-09-03", paidAt: "2026-09-04", amount: 100, status: "Paid", category: "Packaging" }],
   settlements: [{ id: "S-1", orderId: "K-1", settlementDate: "2026-09-06", amountReceived: 1000, fee: 50, status: "Received" }],
 });
@@ -196,10 +212,35 @@ const inventoryAcquisitionSummary = finance.calculateSummary(baseData({
 }), range("2026-09-01", "2026-09-30"));
 assert.strictEqual(inventoryAcquisitionSummary.physicalItemCost, 400, "Inventory investment must come from the immutable item cost snapshot.");
 assert.strictEqual(inventoryAcquisitionSummary.operatingExpenses, 0, "Inventory Acquisition must not be expensed again through operating P&L.");
-assert.strictEqual(inventoryAcquisitionSummary.brandTotalCost, 0, "Unsold stock payments stay out of Total Outflow until the piece is sold.");
+assert.strictEqual(inventoryAcquisitionSummary.brandTotalCost, 400, "All acquired inventory enters Total Outflow once, including unsold stock.");
 assert.strictEqual(inventoryAcquisitionSummary.inventoryPurchaseCashOut, 400, "A paid inventory acquisition must enter cash flow exactly once.");
 assert.strictEqual(inventoryAcquisitionSummary.cashOut, 400);
 assert.strictEqual(inventoryAcquisitionSummary.netCashFlow, -400);
+
+const brandReconciliation = finance.calculateSummary(baseData({
+  orders: [
+    {...deliveredOrder,finalAmount:850.75,amountPaid:850.75,isArchived:true},
+    {...deliveredOrder,id:"PARTIAL",orderId:"PARTIAL",finalAmount:1000,amountPaid:250},
+    {...deliveredOrder,id:"GIFT",orderId:"GIFT",collectionMode:"Third Party",finalAmount:500,amountPaid:500},
+    {...deliveredOrder,id:"UNPAID",orderId:"UNPAID",finalAmount:999,amountPaid:0,paymentStatus:"Unpaid"},
+    {...deliveredOrder,id:"CANCELLED",orderId:"CANCELLED",status:"Cancelled",finalAmount:999,amountPaid:0},
+  ],
+  items: [
+    {itemCode:"SOLD",costSnapshot:380,createdAt:"2026-09-01",status:"Sold"},
+    {itemCode:"STOCK",costSnapshot:620,createdAt:"2026-09-01",status:"In stock",isArchived:true},
+    {itemCode:"ZERO",costSnapshot:0,createdAt:"2026-09-01",status:"Damaged"},
+  ],
+  incomes: [
+    {id:"GIFT-INCOME",kind:"Order Collection",status:"Received",amountMinor:50000,receivedOn:"2026-09-03"},
+    {id:"PENDING",kind:"Other Income",status:"Pending",amountMinor:99900,expectedOn:"2026-09-03"},
+  ],
+  settlements:[{id:"TRANSFER",orderId:"K-1",amountReceived:750.75,fee:10,settlementDate:"2026-09-03"}],
+  expenses:[{id:"STOCK-PAYMENT",status:"Paid",category:"Inventory Acquisition",amount:1000,paidAt:"2026-09-01"}],
+}),range("2026-09-01","2026-09-30"));
+assert.strictEqual(brandReconciliation.totalInflow,1600.75,"Paid orders do not require a second courier receipt; linked gifts enter once.");
+assert.strictEqual(brandReconciliation.totalOutflow,1010,"Sold and unsold inventory enter once; a stock payment does not add them again.");
+assert.strictEqual(brandReconciliation.netProfit,590.75);
+assert.strictEqual(brandReconciliation.cashIn,1250.75,"Actual courier transfers remain separate from customer payments.");
 
 const repeatData = baseData({
   orders: [

@@ -34,6 +34,7 @@ interface DeliveredOrderRow {
   payment_status: string;
   amount_paid_minor: string;
   amount_refunded_minor: string;
+  collection_mode?: string | null;
   event_at: Date;
   cogs_minor: string;
   sold_units: string;
@@ -85,6 +86,7 @@ export interface FinanceSummary {
   totalIncome?: number;
   incomeCashIn?: number;
   orderCashIn?: number;
+  orderInflow?: number;
   pendingIncome?: number;
   financingCashOut?: number;
   cashIn: number;
@@ -249,6 +251,14 @@ export interface BrandLedgerRow {
   details: Record<string, unknown>;
 }
 
+function collectedOrderMinor(row: DeliveredOrderRow): number {
+  // Linked gift receipts have their own received date in finance_income_entries.
+  // Courier settlements transfer an existing payment; they are not another sale.
+  if (row.collection_mode === "Third Party") return 0;
+  return Math.min(Math.max(0, Number(row.final_minor) || 0),
+    Math.max(0, Number(row.amount_paid_minor) || 0));
+}
+
 // These are the contributors to the existing owner-result cards, not bank receipts.
 // Preserve event dates, refund corrections and the acquisition/damage deduplication.
 export function buildBrandLedger(snapshot: FinanceSnapshot, start: string, end: string) {
@@ -311,12 +321,16 @@ export function buildBrandLedger(snapshot: FinanceSnapshot, start: string, end: 
     if (!acquiredCodes.has(code)) outgoing.push({ ...damage[damage.length - 1]!, source: "Damage from older stock" });
   }
   const sort = (rows: BrandLedgerRow[]) => rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
-  const cashIn: BrandLedgerRow[] = [], cashOut: BrandLedgerRow[] = [], profitCost: BrandLedgerRow[] = [];
+  const cashIn: BrandLedgerRow[] = [], cashOut: BrandLedgerRow[] = [], profitCost: BrandLedgerRow[] = [], totalInflow: BrandLedgerRow[] = [];
   const cost = (id: string, date: unknown, source: string, reference: unknown, amount: number, details: Record<string, unknown> = {}) => {
     add(profitCost, id, date, source, reference, amount, details);
   };
   for (const row of snapshot.delivered.filter(row => inRange(row.event_at, start, end))) {
     cost(`cogs:${row.id}`,row.event_at,"Sold-piece cost",row.order_code,Number(row.cogs_minor || 0));
+    const collected = collectedOrderMinor(row);
+    if (row.collection_mode !== "Third Party") add(totalInflow, `order-payment:${row.id}`, row.event_at, "Delivered order payment", row.order_code,
+      collected, { order: row.order_code, pieces: Number(row.sold_units), paymentStatus: row.payment_status,
+        finalMinor: Number(row.final_minor), paidMinor: Number(row.amount_paid_minor) });
   }
   const allReturns = uniqueCompletedReturns(snapshot.states.get("returns") || [], "0001-01-01", "9999-12-31");
   const soldCodes = new Set(snapshot.deliveredCodes);
@@ -340,17 +354,21 @@ export function buildBrandLedger(snapshot: FinanceSnapshot, start: string, end: 
     if (inRange(row.settlementDate,start,end)) add(cashIn,`receipt:${String(row.id)}`,row.settlementDate,"Order cash receipt",row.orderId,toMinor(row.amountReceived));
   }
   for (const row of snapshot.states.get("finance_income") || []) {
-    if (row.status === "Received" && inRange(row.received_on,start,end)) add(cashIn,`income:${String(row.id)}`,row.received_on,String(row.kind),row.description || row.kind,Number(row.amount_minor));
+    if (row.status === "Received" && inRange(row.received_on,start,end)) {
+      add(cashIn,`income:${String(row.id)}`,row.received_on,String(row.kind),row.description || row.kind,Number(row.amount_minor));
+      totalInflow.push({ ...cashIn[cashIn.length - 1]!, lane: "income" });
+    }
   }
   cashOut.push(...outgoing.filter(row => ["COD fee","Exchange courier fee"].includes(row.source)));
   const totalOutflow = [
-    ...profitCost.filter(row => ["Sold-piece cost", "Exchange cost adjustment", "Returned-piece cost reversal"].includes(row.source)),
+    ...outgoing.filter(row => row.source === "Physical item cost"),
     ...cashOut.filter(row => !isInventoryAcquisitionExpense(row.details)),
   ];
   // add() assigns the lane by target; cash receipt rows are always income.
   cashIn.forEach(row => { row.lane="income"; });
+  totalInflow.forEach(row => { row.lane="income"; });
   return { income: sort(income), otherIncome: sort(otherIncome), outgoing: sort(outgoing), damage: sort(damage),
-    cashIn:sort(cashIn),cashOut:sort(cashOut),profitCost:sort(profitCost),totalOutflow:sort(totalOutflow) };
+    cashIn:sort(cashIn),cashOut:sort(cashOut),profitCost:sort(profitCost),totalInflow:sort(totalInflow),totalOutflow:sort(totalOutflow) };
 }
 
 // Every period is calculated from the same immutable, server-read snapshot.
@@ -530,12 +548,14 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     codFeesMinor +
     returnCourierMinor +
     refundsMinor;
-  // Owner's definition: sold-piece cost plus confirmed paid expenses/payments.
-  // Stock payments remain in Cash Flow; recognizing COGS replaces that payment
-  // here, so the same stock is never charged twice or before it is sold.
+  // Brand totals include every acquired physical piece once, including unsold
+  // stock. COGS and return cost reversals remain separate sales metrics. Neither
+  // a courier transfer nor an inventory payment repeats the underlying event.
+  const orderInflowMinor = deliveredRows.reduce((sum, row) => sum + collectedOrderMinor(row), 0);
+  const totalInflowMinor = orderInflowMinor + incomeCashInMinor;
   const totalOperatingMinor = cashOutMinor - inventoryPurchaseCashOutMinor;
-  const totalOutflowMinor = netCogsMinor + totalOperatingMinor;
-  const netProfitMinor = cashInMinor - totalOutflowMinor;
+  const totalOutflowMinor = physicalItemCostMinor + totalOperatingMinor;
+  const netProfitMinor = totalInflowMinor - totalOutflowMinor;
 
   const marketingRows = (states.get("finance_marketing") || [])
     .filter(active)
@@ -578,7 +598,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     deliveryCosts: money(deliveryCostMinor),
     totalOperatingExpenses: money(totalOperatingMinor),
     totalCost: money(totalOutflowMinor),
-    totalInflow: money(cashInMinor),
+    totalInflow: money(totalInflowMinor),
     totalOutflow: money(totalOutflowMinor),
     grossProfit: money(grossProfitMinor),
     netProfit: money(netProfitMinor),
@@ -586,13 +606,13 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     incrementalDamage: money(incrementalDamageMinor),
     brandTotalCost: money(totalOutflowMinor),
     brandNetProfit: money(netProfitMinor),
-    margin: cashInMinor > 0
-      ? metric((netProfitMinor / cashInMinor) * 100)
+    margin: totalInflowMinor > 0
+      ? metric((netProfitMinor / totalInflowMinor) * 100)
       : 0,
     grossMargin: netRevenueMinor > 0
       ? metric((grossProfitMinor / netRevenueMinor) * 100)
       : 0,
-    marginApplicable: cashInMinor > 0,
+    marginApplicable: totalInflowMinor > 0,
     deliveredOrders: deliveredRows.length,
     grossSoldUnits,
     returnedUnits,
@@ -612,6 +632,7 @@ function calculateSnapshot(snapshot: FinanceSnapshot, start: string, end: string
     totalIncome: money(netRevenueMinor + otherIncomeMinor),
     incomeCashIn: money(incomeCashInMinor),
     orderCashIn: money(settlementCashInMinor),
+    orderInflow: money(orderInflowMinor),
     pendingIncome: money(pendingIncomeMinor),
     financingCashOut: money(financingCashOutMinor),
     cashIn: money(cashInMinor),
@@ -660,8 +681,8 @@ export class FinanceService {
     const snapshot = await this.readSnapshot(start, end);
     const summary = calculateSnapshot(snapshot, start, end);
     const ledger = buildBrandLedger(snapshot, start, end);
-    const rows = metric === "sales" ? ledger.cashIn : metric === "cost" ? ledger.totalOutflow
-      : metric === "damage" ? ledger.damage : [...ledger.cashIn, ...ledger.totalOutflow];
+    const rows = metric === "sales" ? ledger.totalInflow : metric === "cost" ? ledger.totalOutflow
+      : metric === "damage" ? ledger.damage : [...ledger.totalInflow, ...ledger.totalOutflow];
     const amountMinor = Math.round((metric === "sales" ? summary.totalInflow : metric === "cost" ? summary.totalOutflow
       : metric === "damage" ? summary.damageValue : summary.netProfit) * 100);
     return { metric, currency: "EGP", start, end, page, limit, total: rows.length,
@@ -922,6 +943,7 @@ export class FinanceService {
                 o.payment_status,
                 o.amount_paid_minor::text,
                 o.amount_refunded_minor::text,
+                o.legacy->>'collectionMode' AS collection_mode,
                 COALESCE(o.delivered_at, o.updated_at) AS event_at,
                 COALESCE(sum(oi.cost_snapshot_minor),0)::text AS cogs_minor,
                 count(oi.id)::text AS sold_units

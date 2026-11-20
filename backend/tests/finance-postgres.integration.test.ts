@@ -3,7 +3,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FinanceService } from "../src/modules/finance/finance.service.js";
+import { FinanceService, type BrandLedgerRow } from "../src/modules/finance/finance.service.js";
 
 let db: PGlite;
 beforeEach(async () => {
@@ -14,7 +14,7 @@ beforeEach(async () => {
       final_minor bigint, delivery_cost_minor bigint DEFAULT 0, payment_method text,
       payment_status text, amount_paid_minor bigint, amount_refunded_minor bigint DEFAULT 0,
       delivered_at timestamptz, updated_at timestamptz, status text,
-      is_deleted boolean DEFAULT false, is_archived boolean DEFAULT false
+      is_deleted boolean DEFAULT false, is_archived boolean DEFAULT false, legacy jsonb DEFAULT '{}'
     );
     CREATE TABLE order_items (id text PRIMARY KEY, order_id text, item_code text, cost_snapshot_minor bigint);
     CREATE TABLE inventory_items (item_code text PRIMARY KEY, cost_snapshot_minor bigint,
@@ -59,6 +59,57 @@ function pool(failSql = false) {
 }
 
 describe("finance SQL snapshot", () => {
+  it("reconciles unpaid/partial/free/gift orders and every acquired piece without repeating transfers or stock payments", async () => {
+    await db.exec(`
+      INSERT INTO orders(id,order_code,status,payment_status,final_minor,amount_paid_minor,delivered_at,legacy) VALUES
+        ('paid','PAID','Delivered','Paid',85075,85075,'2026-11-08T10:00Z','{}'),
+        ('partial','PARTIAL','Delivered','Partially Paid',100000,25000,'2026-11-08T10:00Z','{}'),
+        ('free','FREE','Delivered','Paid',0,0,'2026-11-08T10:00Z','{}'),
+        ('unpaid','UNPAID','Delivered','Unpaid',30000,0,'2026-11-08T10:00Z','{}'),
+        ('gift','GIFT','Delivered','Paid',50000,50000,'2026-11-08T10:00Z','{"collectionMode":"Third Party"}'),
+        ('cancelled','CANCELLED','Cancelled','Unpaid',90000,0,NULL,'{}');
+      INSERT INTO order_items VALUES ('paid-line','paid','SOLD',38000);
+      INSERT INTO inventory_items(item_code,cost_snapshot_minor,created_at) VALUES
+        ('SOLD',38000,'2026-11-08T09:00Z'),('UNSOLD',62000,'2026-11-08T09:00Z'),
+        ('ZERO',0,'2026-11-08T09:00Z');
+      INSERT INTO finance_income_entries VALUES
+        ('gift-income','Order Collection','Received',50000,'2026-11-08','2026-11-09','Gift payment'),
+        ('pending','Other Income','Pending',99900,'2026-11-08',NULL,'Pending');
+      INSERT INTO finance_records VALUES
+        ('finance_expenses','paid-expense',1,'{"id":"paid-expense","status":"Paid","amount":20,"paidAt":"2026-11-08"}'),
+        ('finance_expenses','stock-payment',2,'{"id":"stock-payment","status":"Paid","category":"Inventory Acquisition","amount":1000,"paidAt":"2026-11-08"}'),
+        ('finance_expenses','unpaid-expense',3,'{"id":"unpaid-expense","status":"Unpaid","amount":999,"date":"2026-11-08"}'),
+        ('finance_settlements','transfer',1,'{"id":"transfer","orderId":"PAID","amountReceived":750.75,"fee":10,"settlementDate":"2026-11-09"}');
+      INSERT INTO return_requests VALUES
+        ('refund',1,'{"id":"refund","orderId":"PAID","itemCode":"SOLD","refundAmount":50,"status":"Completed","inspectionStatus":"Good","isPostDeliveryReturn":true,"completedAt":"2026-11-09","originalLineSnapshot":{"costSnapshot":380}}');
+      INSERT INTO damage_records VALUES
+        ('damage',1,'{"id":"damage","itemCode":"UNSOLD","costSnapshot":620,"status":"Damaged","date":"2026-11-09"}');
+    `);
+    const fixture = pool();
+    const service = new FinanceService(fixture.value);
+    const [all, first, later] = await service.summaries([
+      {start:"2026-11-08",end:"2026-11-09"}, {start:"2026-11-08",end:"2026-11-08"}, {start:"2026-11-09",end:"2026-11-09"},
+    ]);
+    expect(all).toMatchObject({orderInflow:1100.75,totalInflow:1600.75,totalOutflow:1080,netProfit:520.75,
+      physicalItemCost:1000,cashIn:1250.75,cashOut:1080,netCogs:0});
+    expect(first).toMatchObject({totalInflow:1100.75,totalOutflow:1020,netProfit:80.75});
+    expect(later).toMatchObject({totalInflow:500,totalOutflow:60,netProfit:440});
+    const access = {costs:true,sales:true,waiting:true};
+    for (const metric of ["sales","cost","profit"] as const) {
+      const firstPage = await service.brandDetails(metric,"2026-11-08","2026-11-09",1,2,access) as {
+        rows: BrandLedgerRow[]; total: number; totals: {amountMinor:number};
+      };
+      const rows = [...firstPage.rows];
+      for (let page = 2; rows.length < firstPage.total; page++) {
+        rows.push(...(await service.brandDetails(metric,"2026-11-08","2026-11-09",page,2,access)).rows as BrandLedgerRow[]);
+      }
+      const total = rows.reduce((sum,row) => sum + (metric === "profit" && row.lane === "outgoing" ? -row.amountMinor : row.amountMinor),0);
+      expect(total).toBe(firstPage.totals.amountMinor);
+      expect(total).toBe(Math.round((metric === "sales" ? all!.totalInflow : metric === "cost" ? all!.totalOutflow : all!.netProfit)*100));
+    }
+    expect(fixture.queries.every(sql => !/\b(?:INSERT|UPDATE|DELETE)\b/.test(sql))).toBe(true);
+  });
+
   it("reads ten relations once, preserves Cairo midnight boundaries and excludes archived expense payloads", async () => {
     const fixture = pool();
     const results = await new FinanceService(fixture.value).summaries([
@@ -72,7 +123,7 @@ describe("finance SQL snapshot", () => {
     expect(results.map((row) => row.inventoryPurchaseCashOut)).toEqual([0, 0, 0]);
     expect(results.map((row) => row.physicalItemCost)).toEqual([100.03, 30.01, 70.02]);
     expect(results.map((row) => row.grossCogs)).toEqual([50.03, 20.01, 30.02]);
-    expect(results[0]).toMatchObject({totalInflow:0,totalOutflow:150.03,netProfit:-150.03});
+    expect(results[0]).toMatchObject({totalInflow:323.03,totalOutflow:200.03,netProfit:123});
     expect(fixture.connect).toHaveBeenCalledOnce();
     expect(fixture.release).toHaveBeenCalledOnce();
     expect(fixture.queries.filter((sql) => sql.trimStart().startsWith("SELECT"))).toHaveLength(10);
