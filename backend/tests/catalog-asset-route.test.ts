@@ -50,6 +50,7 @@ describe("catalog asset HTTP caching", () => {
     expect(response.status).toBe(307);
     expect(response.headers.location).toBe(`/api/v1/catalog/assets/${assetId}?v=${sha256}`);
     expect(response.headers["cache-control"]).toBe(CATALOG_ASSET_REDIRECT_CACHE);
+    expect(response.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=300");
   });
 
   it("serves the matching immutable asset with content type and ETag", async () => {
@@ -58,6 +59,7 @@ describe("catalog asset HTTP caching", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["cache-control"]).toBe(CATALOG_ASSET_IMMUTABLE_CACHE);
+    expect(response.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=31536000, immutable");
     expect(response.headers.etag).toBe(`"${sha256}"`);
     expect(response.headers["content-type"]).toContain("image/webp");
     expect(Buffer.from(response.body)).toEqual(content);
@@ -73,6 +75,7 @@ describe("catalog asset HTTP caching", () => {
     expect(response.status).toBe(304);
     expect(response.headers.etag).toBe(`"${sha256}"`);
     expect(response.headers["cache-control"]).toBe(CATALOG_ASSET_IMMUTABLE_CACHE);
+    expect(response.headers["vercel-cdn-cache-control"]).toBe("public, s-maxage=31536000, immutable");
   });
 
   it("returns 404 for a missing catalogue asset", async () => {

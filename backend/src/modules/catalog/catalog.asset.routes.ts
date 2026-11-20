@@ -69,6 +69,7 @@ export function createCatalogAssetRouter(
     // prevents a replaced asset from being cached forever under stale bytes.
     if (!catalogAssetVersionMatches(request.query.v, asset.sha256)) {
       response.setHeader("Cache-Control", CATALOG_ASSET_REDIRECT_CACHE);
+      response.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=300");
       response.redirect(307, catalogAssetUrl(assetId, asset.sha256));
       return;
     }
@@ -77,6 +78,9 @@ export function createCatalogAssetRouter(
     response.setHeader("Content-Type", asset.contentType);
     response.setHeader("ETag", etag);
     response.setHeader("Cache-Control", CATALOG_ASSET_IMMUTABLE_CACHE);
+    // Only content-hash URLs reach this path. Keep the same public image on
+    // Vercel's edge instead of reading PostgreSQL for every visitor.
+    response.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=31536000, immutable");
     if (request.headers["if-none-match"] === etag) {
       response.status(304).end();
       return;
