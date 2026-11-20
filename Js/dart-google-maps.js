@@ -93,9 +93,10 @@
     const started = performance.now();
     const duration = Math.max(300, Math.min(1000, started - (entry.lastAnimationAt ?? started - 800)));
     entry.lastAnimationAt = started;
-    // Large GPS jumps need an immediate camera/heading correction. Interpolating
-    // them makes the courier arrow temporarily point in the wrong direction.
-    if (!from || metresBetween(from, location) > 75 || document.hidden ||
+    // Snap large GPS jumps while following so the camera points to the
+    // actual direction immediately. Preserve marker interpolation while the
+    // courier is inspecting the map with follow paused.
+    if (!from || metresBetween(from, location) > (entry.follow ? 75 : 250) || document.hidden ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       drawCourier(entry, location, heading, true); entry.frame = null; return;
     }
