@@ -23,6 +23,8 @@ const html=source.replace(/<script\b[\s\S]*?<\/script>/g,'').replace(/<link\b[^>
    assert.equal(layout.dir,'rtl');assert.equal(layout.marginLeft,'0px');
    if(width>768){
     assert.ok(Math.abs(layout.right-width)<2);assert.equal(layout.marginRight,'252px');
+    const shipping=await page.locator('#shipping').evaluate(el=>{el.style.display='block';const r=el.getBoundingClientRect();return {left:r.left,right:r.right};});
+    assert.ok(shipping.left>=-1&&shipping.right<=width-251,'shipping uses the sidebar width');
     await page.evaluate(()=>document.body.classList.add('dart-sidebar-collapsed'));
     assert.equal(await page.locator('#items').evaluate(el=>getComputedStyle(el).marginRight),'72px');
    }else{

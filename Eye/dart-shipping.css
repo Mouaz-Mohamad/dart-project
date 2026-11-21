@@ -24,7 +24,7 @@
    The legacy sidebar offset was applied to section elements only. */
 #shipping.dart-shipping-section{
   margin-inline-start:var(--dart-sidebar-width);
-  width:83%;
+  width:calc(100% - var(--dart-sidebar-width));
   min-width:0;
   max-width:none;
   min-height:100vh;
