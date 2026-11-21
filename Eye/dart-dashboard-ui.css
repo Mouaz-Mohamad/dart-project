@@ -75,11 +75,11 @@ main {
   background: #f5eaf0;
 }
 .dart-filter-count {
-  margin-right: 8px;
+  margin-inline-end: 8px;
 }
 #dart-operation-notices {
   position: fixed;
-  right: 18px;
+  inset-inline-end: 18px;
   bottom: 22px;
   z-index: 13000;
   width: min(420px, calc(100vw - 32px));
@@ -93,7 +93,7 @@ main {
   gap: 12px;
   padding: 14px;
   border: 1px solid #86a895;
-  border-left: 4px solid #246946;
+  border-inline-start: 4px solid #246946;
   border-radius: 8px;
   background: #f1faf4;
   color: #174c31;
@@ -114,11 +114,11 @@ main {
   cursor: pointer;
 }
 .dart-compact-record[aria-busy="true"] {
-  border-left: 4px solid #ab012b;
+  border-inline-start: 4px solid #ab012b;
 }
 button[aria-busy="true"]::after {
   content: "…";
-  margin-left: 5px;
+  margin-inline-start: 5px;
 }
 .dashboard-section input:not([type="checkbox"]):not([type="color"]),
 .dashboard-section textarea,
@@ -296,7 +296,7 @@ dialog button:disabled {
   margin: 0;
   padding: 0 22px 28px;
   border: 0;
-  border-left: 1px solid var(--dart-line);
+  border-inline-start: 1px solid var(--dart-line);
   border-radius: 0;
   overflow: auto;
   background: #fff;
@@ -428,7 +428,8 @@ dialog button:disabled {
 }
 #order-modal-title {
   font-size: 23px;
-  margin: 0 45px 20px 0;
+  margin-block: 0 20px;
+  margin-inline: 0 45px;
 }
 .dart-order-layout {
   display: grid;
@@ -588,14 +589,14 @@ dialog button:disabled {
 @media (max-width: 767px) {
   #dart-operation-notices {
     bottom: 82px;
-    right: 12px;
+    inset-inline-end: 12px;
   }
   body {
     height: auto;
     min-height: 100dvh;
   }
   main {
-    margin-left: 0 !important;
+    margin-inline-start: 0 !important;
     padding: 14px 12px 100px !important;
     width: 100% !important;
   }

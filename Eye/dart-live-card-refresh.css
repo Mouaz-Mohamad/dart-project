@@ -177,9 +177,9 @@
   flex-wrap:wrap;
 }
 #live-operations .dart-live-layer-group{
-  padding-right:10px;
-  margin-right:2px;
-  border-right:1px solid #eadfe4;
+  padding-inline-end:10px;
+  margin-inline-end:2px;
+  border-inline-end:1px solid #eadfe4;
 }
 #live-operations .dart-live-filter{
   display:inline-flex;
@@ -253,7 +253,7 @@
   border-radius:10px;
   background:#fff;
   color:#40313a;
-  text-align:left;
+  text-align:start;
   box-shadow:none;
 }
 #live-operations .dart-live-rep-card:hover,
@@ -447,14 +447,15 @@
   width:100%;
   min-height:42px;
   height:auto;
-  padding:10px 37px 10px 12px;
+  padding-block:10px 10px;
+  padding-inline:12px 37px;
   border:1px solid #dac9d1;
   border-radius:9px;
   background:#fff;
   color:#41303a;
   font-size:12px;
 }
-#card .filter-bar .search-box i{left:auto;right:12px;color:#815166;opacity:.8}
+#card .filter-bar .search-box i{inset-inline-start:auto;inset-inline-end:12px;color:#815166;opacity:.8}
 #card .filter-bar .select-box{
   flex:1 1 160px;
   min-width:140px;
@@ -464,14 +465,15 @@
   width:100%;
   min-height:42px;
   height:auto;
-  padding:9px 31px 9px 11px;
+  padding-block:9px 9px;
+  padding-inline:11px 31px;
   border:1px solid #dac9d1;
   border-radius:9px;
   background:#fff;
   color:#44323f;
   font-size:12px;
 }
-#card .filter-bar .select-box .arrow-icon{left:auto;right:9px;color:#7f4961}
+#card .filter-bar .select-box .arrow-icon{inset-inline-start:auto;inset-inline-end:9px;color:#7f4961}
 #card .filter-bar .add-btn{
   display:inline-flex;
   justify-content:center;
@@ -502,7 +504,7 @@
   margin:7px 0 12px;
   gap:8px;
   flex-wrap:wrap;
-  text-align:left;
+  text-align:start;
 }
 #card .second button{
   min-height:39px;
@@ -628,7 +630,7 @@
   max-width:none;
   padding:0 22px 28px;
   background:#fdfbfc;
-  border-left:1px solid #e6d8df;
+  border-inline-start:1px solid #e6d8df;
 }
 #card .dart-record-dialog-head{
   position:sticky;
@@ -702,7 +704,8 @@
   color:#392b35;
 }
 #card-modal .modal-content>h3{
-  margin:0 32px 17px 0;
+  margin-block:0 17px;
+  margin-inline:0 32px;
   color:#452036;
   font-size:19px;
   font-weight:800;
@@ -779,7 +782,7 @@
   #live-operations.dashboard-section,
   #card.dashboard-section{
     width:100%!important;
-    margin-left:0!important;
+    margin-inline-start:0!important;
     min-height:100dvh;
     padding:16px 12px 100px!important;
   }
@@ -808,10 +811,10 @@
   #live-operations .dart-live-sidebar{max-height:225px}
   #live-operations .dart-live-map-shell,
   #live-operations #dart-live-operations-map{min-height:530px}
-  #live-operations .dart-live-overlay{left:9px;right:9px;top:9px}
+  #live-operations .dart-live-overlay{inset-inline-start:9px;inset-inline-end:9px;top:9px}
   #live-operations .dart-live-legend{gap:6px;padding:7px;font-size:9px}
   #live-operations .dart-live-panel{
-    width:auto;left:8px;right:8px;top:auto;bottom:8px;
+    width:auto;inset-inline-start:8px;inset-inline-end:8px;top:auto;bottom:8px;
     max-height:66%;
     border-radius:12px;
     padding:12px;

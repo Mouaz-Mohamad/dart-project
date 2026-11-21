@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 const inventory = readFileSync(new URL("../../src/dashboard/inventory.js",import.meta.url),"utf8");
 const catalog = readFileSync(new URL("../../src/storefront/catalog.js",import.meta.url),"utf8");
 
+const admin = readFileSync(new URL("../../src/dashboard/item-batch.js",import.meta.url),"utf8");
+
 describe("physical item save acknowledgement",()=>{
   it("keeps the editor busy until the server write and authoritative rehydration finish",()=>{
     const editor=inventory.slice(inventory.indexOf("function setupItemModal()"),inventory.indexOf("function populateItemOptions("));
@@ -17,10 +19,11 @@ describe("physical item save acknowledgement",()=>{
     expect(editor).toContain('form.removeAttribute("aria-busy")');
     expect(editor).toContain("saveButton.disabled = false");
     expect(catalog).toContain("async function savePhysicalItem(item)");
-    expect(catalog).toContain('method: "PATCH"');
-    expect(catalog).toContain("items: [row]");
-    expect(catalog).toContain("recordVersions: { models: {}, items:");
-    expect(catalog).toContain("await hydrateCatalog(true)");
+    expect(admin).toContain('method: "PATCH"');
+    expect(admin).toContain("items: rows");
+    expect(catalog).toContain("async function savePhysicalItems(batch)");
+    expect(admin).toContain("recordVersions: { models: {}, items:");
+    expect(admin).toContain("await state.hydrate(true)");
   });
   it("does not report or close on an unconfirmed write and blocks duplicate submissions",()=>{
     const editor=inventory.slice(inventory.indexOf("function setupItemModal()"),inventory.indexOf("function populateItemOptions("));

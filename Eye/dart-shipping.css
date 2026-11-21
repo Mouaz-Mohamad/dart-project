@@ -23,7 +23,7 @@
 /* Shipping is now an article, so it needs its own desktop layout.
    The legacy sidebar offset was applied to section elements only. */
 #shipping.dart-shipping-section{
-  margin-left:17%;
+  margin-inline-start:var(--dart-sidebar-width);
   width:83%;
   min-width:0;
   max-width:none;
@@ -117,7 +117,7 @@
 /* Match the dashboard bottom navigation breakpoint (768px), not just 760px. */
 @media(max-width:768px){
   #shipping.dart-shipping-section{
-    margin-left:0;
+    margin-inline-start:0;
     width:100%;
     min-height:calc(100dvh - 60px);
     height:auto;

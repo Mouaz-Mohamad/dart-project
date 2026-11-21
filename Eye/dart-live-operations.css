@@ -133,8 +133,8 @@
   align-items: center;
 }
 .dart-live-layer-group {
-  padding-right: 8px;
-  border-right: 1px solid #e5dfd7;
+  padding-inline-end: 8px;
+  border-inline-end: 1px solid #e5dfd7;
 }
 .dart-live-filter {
   display: inline-flex;
@@ -209,7 +209,7 @@
   padding: 9px;
   background: #fff;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -280,8 +280,8 @@
 .dart-live-overlay {
   position: absolute;
   z-index: 500;
-  left: 14px;
-  right: 14px;
+  inset-inline-start: 14px;
+  inset-inline-end: 14px;
   top: 14px;
   display: flex;
   justify-content: space-between;
@@ -311,7 +311,10 @@
 .dart-live-marker {
   width: 34px;
   height: 34px;
-  border-radius: 50% 50% 50% 4px;
+  border-start-start-radius: 50%;
+  border-start-end-radius: 50%;
+  border-end-end-radius: 50%;
+  border-end-start-radius: 4px;
   transform: rotate(-45deg);
   border: 3px solid white;
   display: grid;
@@ -347,7 +350,7 @@
   position: absolute;
   z-index: 700;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   width: min(390px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   overflow: auto;
@@ -566,8 +569,8 @@
     width: 100%;
   }
   .dart-live-layer-group {
-    padding-right: 0;
-    border-right: 0;
+    padding-inline-end: 0;
+    border-inline-end: 0;
   }
   .dart-live-map-shell,
   #dart-live-operations-map {
@@ -576,8 +579,8 @@
   .dart-live-panel {
     top: auto;
     bottom: 8px;
-    left: 8px;
-    right: 8px;
+    inset-inline-start: 8px;
+    inset-inline-end: 8px;
     width: auto;
     max-height: 72%;
   }

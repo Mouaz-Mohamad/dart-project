@@ -112,13 +112,14 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
   height:auto;
   border:1px solid #d8c9d0;
   border-radius:9px;
-  padding:10px 38px 10px 12px;
+  padding-block:10px 10px;
+  padding-inline:12px 38px;
   background:#fff;
   color:#352a32;
   font-size:12px;
 }
 #models .first.filter-bar .search-box input::placeholder{color:#91818b}
-#models .first.filter-bar .search-box>i{right:12px;left:auto;color:#744159;opacity:.85}
+#models .first.filter-bar .search-box>i{inset-inline-end:12px;inset-inline-start:auto;color:#744159;opacity:.85}
 #models .first.filter-bar .select-box{
   flex:1 1 145px;
   min-width:135px;
@@ -131,14 +132,15 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
   height:auto;
   border:1px solid #d8c9d0;
   border-radius:9px;
-  padding:9px 31px 9px 12px;
+  padding-block:9px 9px;
+  padding-inline:12px 31px;
   background:#fff;
   color:#453641;
   font-size:12px;
   font-weight:650;
   cursor:pointer;
 }
-#models .first.filter-bar .select-box>.arrow-icon{right:9px;left:auto;color:#7c4660;pointer-events:none}
+#models .first.filter-bar .select-box>.arrow-icon{inset-inline-end:9px;inset-inline-start:auto;color:#7c4660;pointer-events:none}
 #models .first.filter-bar .add-btn{
   display:inline-flex;
   align-items:center;
@@ -198,7 +200,7 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
   width:100%;
   min-height:42px;
   margin:5px 0 12px;
-  text-align:left;
+  text-align:start;
 }
 #models .second>button,
 #models .second .dart-model-set-view-btn{
@@ -447,7 +449,7 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
 #model-modal .price-summary strong{color:#8d2146;font-size:17px}
 #model-modal .close-modal{
   top:10px;
-  right:15px;
+  inset-inline-end:15px;
   z-index:2;
   padding:4px 9px;
   color:#6e3b52;
@@ -458,7 +460,7 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
 }
 @media(max-width:768px){
   #models.dashboard-section{
-    margin-left:0!important;
+    margin-inline-start:0!important;
     width:100%!important;
     padding:15px 12px 100px!important;
     min-height:100dvh;
@@ -520,12 +522,14 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
 #model-modal .dart-related-models-grid{
   display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:9px;min-width:0;max-height:340px;overflow:auto;overscroll-behavior:contain;
-  padding:3px 4px 7px 2px;
+  padding-block:3px 7px;
+  padding-inline:2px 4px;
 }
 #model-modal .dart-related-card{
   position:relative;display:flex;align-items:center;gap:10px;
-  text-align:left;min-width:0;min-height:89px;width:100%;
-  padding:9px 31px 9px 9px;cursor:pointer;
+  text-align:start;min-width:0;min-height:89px;width:100%;
+  padding-block:9px 9px;
+  padding-inline:9px 31px;cursor:pointer;
   border:1px solid #e6dae1;border-radius:11px;background:#fff;color:#3c2b35;
   font:inherit;box-shadow:0 1px 5px #401c2a06;
   transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
@@ -538,7 +542,7 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
   outline:2px solid #ab012b;outline-offset:2px;
 }
 #model-modal .dart-related-card[aria-pressed="true"]{
-  border:2px solid #ab012b;padding:8px 30px 8px 8px;
+  border:2px solid #ab012b;padding-block:8px 8px;padding-inline:8px 30px;
   background:#fff1f5;box-shadow:0 3px 13px #ab012b12;
 }
 #model-modal .dart-related-card-image{
@@ -558,7 +562,7 @@ padding:10px clamp(6px,0.4vw,32px) 10px!important;
   font-size:10px;color:#7b6e77;overflow-wrap:anywhere;
 }
 #model-modal .dart-related-card-check{
-  position:absolute;top:8px;right:8px;display:grid;place-items:center;
+  position:absolute;top:8px;inset-inline-end:8px;display:grid;place-items:center;
   width:19px;height:19px;border:1px solid #d5c5cc;border-radius:50%;
   color:transparent;background:#fff;font-size:12px;font-weight:900;
 }

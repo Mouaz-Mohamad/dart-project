@@ -48,7 +48,6 @@ body::-webkit-scrollbar,
 html {
   font-size: 100%;
   scroll-behavior: smooth;
-  direction: ltr;
   background-color: var(--white);
   color: var(--text-main);
   overflow: scroll;
@@ -147,7 +146,7 @@ textarea {
   height: 100vh;
   position: fixed;
   top: 0;
-  left: 0;
+  inset-inline-start: 0;
   background-image:
     linear-gradient(rgba(25, 72, 95, 0.85), rgba(25, 72, 95, 0.85)),
     image-set(
@@ -214,7 +213,7 @@ textarea {
 }
 
 section {
-  margin-left: 17%;
+  margin-inline-start: 17%;
   width: 83%;
   height: 99vh;
   background-color: var(--white);
@@ -227,7 +226,10 @@ section {
   display: flex;
   align-items: center;
   width: 100%;
-  border-radius: 0 50px 50px 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: 50px;
+  border-end-end-radius: 50px;
+  border-end-start-radius: 0;
   gap: 15px;
   background-color: var(--white);
   padding: 12px 20px;
@@ -244,7 +246,8 @@ section {
 
 .search-box input {
   width: 230px;
-  padding: 8px 35px 8px 15px;
+  padding-block: 8px 8px;
+  padding-inline: 15px 35px;
   border: 1px solid var(--bragnte);
   border-radius: 20px;
   outline: none;
@@ -260,7 +263,7 @@ section {
 
 .search-box i {
   position: absolute;
-  right: 12px;
+  inset-inline-end: 12px;
   color: var(--bragnte);
   font-size: 16px;
   pointer-events: none;
@@ -280,7 +283,8 @@ section {
   background: #fff;
   border: 1px solid var(--bragnte);
   border-radius: 10px;
-  padding: 8px 32px 8px 35px;
+  padding-block: 8px 8px;
+  padding-inline: 35px 32px;
   font-size: 14px;
   color: var(--bragnte);
   cursor: pointer;
@@ -289,7 +293,7 @@ section {
 
 .select-box .arrow-icon {
   position: absolute;
-  left: 10px;
+  inset-inline-start: 10px;
   color: var(--primary-red);
   font-size: 18px;
   pointer-events: none;
@@ -301,7 +305,7 @@ section {
 }
 
 .second {
-  text-align: right;
+  text-align: end;
   margin: 10px 0px;
   width: 98%;
 }
@@ -317,7 +321,7 @@ section {
 .title-name {
   display: flex;
   align-items: center;
-  padding: 0 0 0 20px;
+  padding-block: 0 0;
   background-color: var(--bragnte);
   margin-bottom: 20px;
   width: fit-content;
@@ -477,7 +481,7 @@ section {
   display: none;
   position: fixed;
   z-index: 9999;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   width: 100%;
   height: 100%;
@@ -513,7 +517,7 @@ section {
 .close-item-modal {
   position: absolute;
   top: 20px;
-  right: 25px;
+  inset-inline-end: 25px;
   font-size: 24px;
   font-weight: bold;
   cursor: pointer;
@@ -576,7 +580,7 @@ section {
 
 .price-summary strong {
   color: var(--bragnte, #ab012b);
-  margin-left: 8px;
+  margin-inline-start: 8px;
 }
 
 .btn-done {
@@ -968,7 +972,7 @@ section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-left: 4px;
+  padding-inline-start: 4px;
 }
 
 /* 1. تنسيقات المستجدات */
@@ -979,7 +983,7 @@ section {
   padding: 10px 12px;
   background: #f9f9f9;
   border-radius: 8px;
-  border-right: 3px solid #ab012b;
+  border-inline-end: 3px solid #ab012b;
 }
 
 .feed-item i {
@@ -1152,7 +1156,7 @@ section {
   background: #fdf8f9;
   padding: 10px 12px;
   border-radius: 8px;
-  border-right: 3px solid #ab012b;
+  border-inline-end: 3px solid #ab012b;
 }
 
 .chart-title-tow small {
@@ -1228,7 +1232,7 @@ section {
 .traffic-table-tow th,
 .traffic-table-tow td {
   padding: 9px 10px;
-  text-align: left;
+  text-align: start;
   border-bottom: 1px solid #f0f0f0;
   white-space: nowrap;
 }
@@ -1295,7 +1299,7 @@ section {
   }
 
   section {
-    margin-left: 0 !important;
+    margin-inline-start: 0 !important;
     width: 100% !important;
     height: auto !important;
     min-height: 100vh;
@@ -1312,7 +1316,7 @@ section {
     display: block !important;
     position: fixed !important;
     bottom: 0 !important;
-    left: 0 !important;
+    inset-inline-start: 0 !important;
     width: 100% !important;
     height: 60px !important;
     background-color: #19485f !important;
@@ -1971,7 +1975,7 @@ section {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  padding-right: 4px;
+  padding-inline-end: 4px;
 }
 .row-action-btns::-webkit-scrollbar {
   display: none;
@@ -2013,7 +2017,7 @@ section {
 }
 
 .notification-filter-wrap {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 #notificationFilter {
   min-width: 130px;
@@ -2021,7 +2025,8 @@ section {
   border: 1px solid var(--bragnte);
   color: var(--bragnte);
   border-radius: 8px;
-  padding: 6px 28px 6px 10px;
+  padding-block: 6px 6px;
+  padding-inline: 10px 28px;
 }
 .dart-notification {
   display: grid;
@@ -2031,7 +2036,7 @@ section {
   margin-bottom: 8px;
   padding: 10px;
   border-radius: 10px;
-  border-left: 4px solid #64748b;
+  border-inline-start: 4px solid #64748b;
   background: #f8fafc;
   transition: 0.2s ease;
   cursor: pointer;
@@ -2062,49 +2067,49 @@ section {
 }
 .notif-order {
   background: #eff6ff;
-  border-left-color: #2563eb;
+  border-inline-start-color: #2563eb;
 }
 .notif-order .notif-icon {
   color: #2563eb;
 }
 .notif-inventory {
   background: #f5f3ff;
-  border-left-color: #7c3aed;
+  border-inline-start-color: #7c3aed;
 }
 .notif-inventory .notif-icon {
   color: #7c3aed;
 }
 .notif-return {
   background: #fff7ed;
-  border-left-color: #ea580c;
+  border-inline-start-color: #ea580c;
 }
 .notif-return .notif-icon {
   color: #ea580c;
 }
 .notif-damage {
   background: #fef2f2;
-  border-left-color: #dc2626;
+  border-inline-start-color: #dc2626;
 }
 .notif-damage .notif-icon {
   color: #dc2626;
 }
 .notif-payment {
   background: #ecfdf5;
-  border-left-color: #059669;
+  border-inline-start-color: #059669;
 }
 .notif-payment .notif-icon {
   color: #059669;
 }
 .notif-customer {
   background: #fdf2f8;
-  border-left-color: #db2777;
+  border-inline-start-color: #db2777;
 }
 .notif-customer .notif-icon {
   color: #db2777;
 }
 .notif-system {
   background: #f8fafc;
-  border-left-color: #475569;
+  border-inline-start-color: #475569;
 }
 .notif-system .notif-icon {
   color: #475569;
@@ -2131,7 +2136,7 @@ section {
 .profit-cont > .dart-info-btn {
   position: absolute;
   top: 8px;
-  right: 8px;
+  inset-inline-end: 8px;
   z-index: 3;
 }
 .card-inf-2,
@@ -2325,7 +2330,7 @@ section {
   gap: 20px;
   align-items: flex-start;
   margin-bottom: 16px;
-  padding-right: 30px;
+  padding-inline-end: 30px;
 }
 .dart-size-chart-admin-head h3 {
   margin: 0 0 5px;
@@ -2410,7 +2415,7 @@ section {
 }
 .dart-size-chart-admin-table [data-size-field="notes"] {
   width: 150px;
-  text-align: left;
+  text-align: start;
 }
 .dart-size-chart-remove-row {
   width: 34px;
@@ -2427,7 +2432,7 @@ section {
   min-height: 38px;
   margin: 12px 0;
   padding: 9px 11px;
-  border-left: 3px solid #64748b;
+  border-inline-start: 3px solid #64748b;
   border-radius: 6px;
   background: #f8fafc;
   color: #475569;
@@ -2453,7 +2458,7 @@ section {
   font-weight: 700;
 }
 .dart-delivery-zone-note i {
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 @media (max-width: 700px) {
   .dart-size-chart-admin-head {
@@ -2526,7 +2531,7 @@ section {
   padding: 10px;
   border: 0;
   background: #fff;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .dart-address-results button:hover {
@@ -2862,7 +2867,7 @@ body.dart-admin-locked > main {
   border-radius: 9px;
   background: #fff;
   color: #111827;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .dart-delete-choice span {
@@ -2914,7 +2919,7 @@ body.dart-admin-locked > main {
 }
 .title-name input,
 .model-checkbox {
-  margin-right: 0 !important;
+  margin-inline-end: 0 !important;
   flex: 0 0 25px;
 }
 .title-name .w100,
@@ -3038,7 +3043,7 @@ body.dart-admin-locked > main {
 .dart-waiting-table td {
   padding: 10px 9px;
   border-bottom: 1px solid #edf0f3;
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
 }
 .dart-waiting-table td {
@@ -3095,7 +3100,7 @@ body.dart-admin-locked > main {
 }
 .dart-waiting-actions-pop button {
   width: 100%;
-  text-align: left;
+  text-align: start;
   border: 0;
   padding: 8px;
   border-radius: 7px;
@@ -3336,7 +3341,7 @@ body.dart-admin-locked > main {
 .dart-admin-set-close {
   position: absolute;
   top: 10px;
-  right: 12px;
+  inset-inline-end: 12px;
   width: 36px;
   height: 36px;
   border: 0;

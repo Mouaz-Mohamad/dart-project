@@ -8,6 +8,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `storefront/platform/` | Customer identity, analytics, cart, checkout, profile, rewards and startup | `Js/dart-platform.js` |
 | `dashboard/catalog-admin.js` | Versioned catalog record writes | `Eye/dart-catalog-admin.js` |
 | `dashboard/order-address.js` | Google Maps/Places picker for manual order delivery addresses | `Eye/dart-order-address.js` |
+| `dashboard/item-batch.js` | Dashboard-only code fields and transactional batch save | `Eye/dart-item-batch.js` |
 | `dashboard/inventory.js` | Inventory, model and item editor UI | `Eye/dart-inventory.js` |
 | `dashboard/shipping-ui.js` | Shipping Companies tabs and editor presentation | `Eye/dart-shipping-ui.js` |
 | `dashboard/settings.js` | Settings forms and data reset UI | `Eye/dart-settings.js` |

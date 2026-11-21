@@ -1,5 +1,5 @@
 /* Arabic wording and typography for the internal dashboard and courier portal.
-   Keep the existing LTR positioning of charts/maps and the established dashboard grids. */
+   Layout follows the document direction; maps and chart coordinates stay physical. */
 html[lang="ar"] body {
   font-family: "Cairo", "Readex Pro", "Inter", sans-serif;
 }
@@ -30,4 +30,16 @@ html[lang="ar"] #repDashboardView .dart-rep-dashboard-head {
 }
 html[lang="ar"] #repDashboardView #repIdentity {
   unicode-bidi: plaintext;
+}
+
+/* The dashboard inherits RTL for rows, grids, tables, forms and navigation. */
+html[dir="rtl"] body { text-align: start; }
+html[dir="rtl"] :is(input[type="email"], input[type="tel"], input[type="url"], input[type="number"], #modal-item-model-id, #modal-item-code-pic, #dart-item-extra-codes input) {
+  direction: ltr;
+  text-align: end;
+  unicode-bidi: isolate;
+}
+html[dir="rtl"] :is(.leaflet-container, .gm-style, .apexcharts-canvas, .chartjs-size-monitor) {
+  direction: ltr;
+  text-align: left;
 }

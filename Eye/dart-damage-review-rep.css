@@ -67,12 +67,13 @@
 #damage .first.filter-bar .search-box input,#review .first.filter-bar .search-box input,
 #representative .first.filter-bar .search-box input{
   width:100%;min-height:42px;height:auto;min-width:0;
-  padding:10px 37px 10px 12px;border:1px solid #d9cad2;
+  padding-block:10px 10px;
+  padding-inline:12px 37px;border:1px solid #d9cad2;
   border-radius:9px;background:#fff;color:#3b2b36;font-size:12px;
 }
 #damage .first.filter-bar .search-box i,#review .first.filter-bar .search-box i,
 #representative .first.filter-bar .search-box i{
-  left:auto;right:12px;color:#81516a;opacity:.75;
+  inset-inline-start:auto;inset-inline-end:12px;color:#81516a;opacity:.75;
 }
 #damage .first.filter-bar .select-box,#review .first.filter-bar .select-box,
 #representative .first.filter-bar .select-box{
@@ -81,12 +82,13 @@
 #damage .first.filter-bar .select-box select,#review .first.filter-bar .select-box select,
 #representative .first.filter-bar .select-box select{
   display:block;width:100%;min-height:42px;height:auto;
-  padding:9px 29px 9px 11px;border:1px solid #d9cad2;
+  padding-block:9px 9px;
+  padding-inline:11px 29px;border:1px solid #d9cad2;
   border-radius:9px;background:#fff;color:#4d3946;font-size:12px;cursor:pointer;
 }
 #damage .first.filter-bar .select-box .arrow-icon,#review .first.filter-bar .select-box .arrow-icon,
 #representative .first.filter-bar .select-box .arrow-icon{
-  left:auto;right:9px;color:#815169;pointer-events:none;
+  inset-inline-start:auto;inset-inline-end:9px;color:#815169;pointer-events:none;
 }
 #damage .first.filter-bar .add-btn,#review .first.filter-bar .add-btn,
 #representative .first.filter-bar .add-btn{
@@ -111,7 +113,7 @@
 }
 #damage .second,#review .second,#representative .second{
   display:flex;align-items:center;justify-content:flex-start;
-  gap:8px;flex-wrap:wrap;min-height:43px;margin:6px 0 12px;width:100%;text-align:left;
+  gap:8px;flex-wrap:wrap;min-height:43px;margin:6px 0 12px;width:100%;text-align:start;
 }
 #damage .second button,#review .second button,#representative .second button{
   display:inline-flex;align-items:center;justify-content:center;gap:7px;
@@ -209,7 +211,7 @@
 #damage .dart-record-dialog,#review .dart-record-dialog,
 #representative .dart-record-dialog{
   width:min(900px,97vw);max-width:none;max-height:100dvh;
-  padding:0 22px 28px;background:#fdfbfc;border-left:1px solid #e9dce1;
+  padding:0 22px 28px;background:#fdfbfc;border-inline-start:1px solid #e9dce1;
 }
 #damage .dart-record-dialog-head,#review .dart-record-dialog-head,
 #representative .dart-record-dialog-head{
@@ -332,7 +334,8 @@
 }
 #damage-modal .modal-content{width:min(650px,95vw);max-width:650px}
 #damage-modal .modal-content>h3{
-  margin:0 35px 16px 0;color:#4b2337;font-size:19px;font-weight:800;
+  margin-block:0 16px;
+  margin-inline:0 35px;color:#4b2337;font-size:19px;font-weight:800;
 }
 #damage-modal .modal-grid,#customer-review-modal .modal-grid,
 #representative-modal .modal-grid{gap:13px 18px}
@@ -385,7 +388,7 @@
 }
 @media(max-width:768px){
   #damage.dashboard-section,#review.dashboard-section,#representative.dashboard-section{
-    width:100%!important;margin-left:0!important;min-height:100dvh;
+    width:100%!important;margin-inline-start:0!important;min-height:100dvh;
     padding:16px 12px 100px!important;
   }
   #damage .dart-operations-page-badge,#review .dart-operations-page-badge,

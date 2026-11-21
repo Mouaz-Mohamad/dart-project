@@ -400,7 +400,7 @@
 .dart-reset-modal-close {
   position: absolute;
   top: 12px;
-  right: 14px;
+  inset-inline-end: 14px;
   display: grid;
   place-items: center;
   width: 34px;
@@ -431,7 +431,7 @@
 
 .dart-reset-modal-content h2 {
   max-width: 500px;
-  padding-right: 30px;
+  padding-inline-end: 30px;
   font-size: clamp(21px, 3vw, 27px);
   line-height: 1.35;
 }
@@ -590,7 +590,7 @@
     padding: 20px 16px !important;
   }
   .dart-reset-modal-content h2 {
-    padding-right: 26px;
+    padding-inline-end: 26px;
   }
   .dart-reset-actions {
     flex-direction: column-reverse;
@@ -1053,7 +1053,7 @@ body[data-dart-density="compact"] .dart-compact-record {
 #settings .dart-settings-layout{display:grid;grid-template-columns:minmax(215px,240px) minmax(0,1fr);align-items:start;gap:18px}
 #settings .dart-settings-panel{min-width:0}
 #settings .dart-settings-tabs{position:sticky;top:16px;display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 32px);margin:0;padding:8px;overflow:auto;border:1px solid var(--dart-settings-line);border-radius:16px;background:#fff}
-#settings .dart-settings-tab{width:100%;min-width:0;min-height:58px;flex:0 0 auto;justify-content:flex-start;gap:11px;padding:11px 12px;text-align:left;border-radius:11px;white-space:normal}
+#settings .dart-settings-tab{width:100%;min-width:0;min-height:58px;flex:0 0 auto;justify-content:flex-start;gap:11px;padding:11px 12px;text-align:start;border-radius:11px;white-space:normal}
 #settings .dart-settings-tab>i{width:19px;flex:0 0 19px;font-size:16px;text-align:center}
 #settings .dart-settings-tab-copy{display:grid;gap:3px;min-width:0}
 #settings .dart-settings-tab-label{font-size:12px;font-weight:800;line-height:1.4}
@@ -1069,7 +1069,7 @@ body[data-dart-density="compact"] .dart-compact-record {
 #settings .dart-settings-utility #settings-search-status{flex-basis:100%;margin:0;font-size:12px;color:var(--dart-settings-muted)}
 #settings .dart-settings-search-results{flex-basis:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:10px;border:1px solid var(--dart-settings-line);border-radius:12px;background:#fff}
 #settings .dart-settings-search-results[hidden]{display:none!important}
-#settings .dart-settings-search-result{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid #e9e1e4;border-radius:9px;background:#fbfaf9;color:var(--dart-settings-ink);text-align:left;cursor:pointer}
+#settings .dart-settings-search-result{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid #e9e1e4;border-radius:9px;background:#fbfaf9;color:var(--dart-settings-ink);text-align:start;cursor:pointer}
 #settings .dart-settings-search-result:hover,#settings .dart-settings-search-result:focus-visible{border-color:var(--dart-settings-burgundy);background:#f9f0f2;outline-offset:2px}
 #settings .dart-settings-search-result small{flex:0 1 auto;color:var(--dart-settings-muted);font-size:10px}
 #settings .dart-settings-search-empty{grid-column:1/-1;margin:0;padding:9px;color:var(--dart-settings-muted)}

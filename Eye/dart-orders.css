@@ -199,14 +199,15 @@
   width:100%;
   min-height:42px;
   height:auto;
-  padding:10px 34px 10px 12px;
+  padding-block:10px 10px;
+  padding-inline:12px 34px;
   border:1px solid #d9cbd2;
   border-radius:9px;
   font-size:12px;
 }
 #orders .first.filter-bar .search-box i{
-  left:auto;
-  right:12px;
+  inset-inline-start:auto;
+  inset-inline-end:12px;
   opacity:.65;
   color:#704559;
 }
@@ -223,7 +224,8 @@
   border:1px solid #d9cbd2;
   border-radius:9px;
   background:#fff;
-  padding:8px 28px 8px 11px;
+  padding-block:8px 8px;
+  padding-inline:11px 28px;
   color:#372b33;
   font-size:12px;
 }
@@ -263,7 +265,7 @@
   flex-wrap:wrap;
   margin:0 0 12px;
   gap:8px;
-  text-align:left;
+  text-align:start;
 }
 #orders .second .delete-btn,
 #orders .second .orders-view-toggle{
@@ -318,7 +320,7 @@
   margin:0;
 }
 #orders .dart-orders-bulk-chevron{
-  margin-left:auto;
+  margin-inline-start:auto;
   transition:transform .15s ease;
 }
 #orders .dart-orders-bulk-panel[open] .dart-orders-bulk-chevron{transform:rotate(180deg)}
@@ -491,7 +493,7 @@
 }
 @media(max-width:768px){
   #orders.dashboard-section{
-    margin-left:0 !important;
+    margin-inline-start:0 !important;
     width:100% !important;
     min-height:100dvh;
     padding:16px 12px 100px !important;
@@ -536,7 +538,7 @@
   }
   #orders .cont-card-info .card-inf{
     padding:12px !important;
-    text-align:left !important;
+    text-align:start !important;
     border-radius:12px !important;
   }
   #orders .cont-card-info .card-inf .span-img{

@@ -92,6 +92,7 @@ const pageScopedFeatureFiles = new Set([
   "Js/dart-news-links.js",
   "Eye/dart-news-admin.js",
   "Eye/dart-catalog-admin.js",
+  "Eye/dart-item-batch.js",
   "Js/dart-whatsapp-preferences.js",
   "Js/dart-customer-notifications.js",
   "Js/dart-passwordless-ui.js",
@@ -168,6 +169,8 @@ const coverageFeatureFiles = new Set([
   "Eye/dart-shipping.js",
   "Eye/dart-coverage-picker.js",
 ]);
+if (fs.statSync("Eye/dart-item-batch.js").size > 4 * 1024) failures.push("Dashboard item batching exceeds its 4 KiB cap");
+if (rootHtml.some(file => fs.readFileSync(file,"utf8").includes("dart-item-batch.js"))) failures.push("Item batching must stay dashboard-only");
 const maxJsBytes = 260 * 1024;
 let totalJsBytes = 0;
 let dashboardFilterBytes = 0;

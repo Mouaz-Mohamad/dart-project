@@ -126,4 +126,12 @@ for (const [name, html] of [["dashboard", dashboard], ["courier", courier]]) {
   assert.match(html, /dart-internal-ar\.css/, name + " must load Arabic typography");
 }
 assert.ok(css.includes("direction: rtl"));
+assert.match(dashboard, /<html lang="ar" dir="rtl">/);
+const styles = fs.readdirSync(path.join(root, "Eye")).filter(file => file.endsWith(".css"));
+for (const file of styles) {
+  const text = fs.readFileSync(path.join(root, "Eye", file), "utf8");
+  assert.doesNotMatch(text, /(?:margin|padding|border)-(?:left|right)\s*:/, file + " must use logical spacing");
+  assert.doesNotMatch(text, /text-align:\s*(?:left|right)\b/, file + " must align with reading direction");
+}
+assert.match(fs.readFileSync(path.join(root,"Eye/dart-sidebar.css"),"utf8"), /html\[dir="rtl"\].*dart-sidebar-mobile-open/);
 console.log("PASS Arabic UI labels: dashboard, courier, dynamic content and unchanged business identifiers");

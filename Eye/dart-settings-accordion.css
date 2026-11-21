@@ -33,7 +33,7 @@
   background: transparent;
   color: #442238;
   padding: 2px 0;
-  text-align: left;
+  text-align: start;
   font: inherit;
   cursor: pointer;
 }

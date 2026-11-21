@@ -49,20 +49,22 @@
 }
 #news .first.filter-bar .search-box input{
   display:block;width:100%;min-height:42px;height:auto;
-  padding:9px 36px 9px 12px;border:1px solid #d8c7d0;
+  padding-block:9px 9px;
+  padding-inline:12px 36px;border:1px solid #d8c7d0;
   border-radius:9px;background:#fff;color:#402c38;font-size:12px;
 }
-#news .first.filter-bar .search-box i{left:auto;right:12px;color:#7d4b65}
+#news .first.filter-bar .search-box i{inset-inline-start:auto;inset-inline-end:12px;color:#7d4b65}
 #news .first.filter-bar .select-box{
   flex:1 1 140px;min-width:125px;max-width:210px;
 }
 #news .first.filter-bar .select-box select{
   display:block;width:100%;min-height:42px;height:auto;
-  padding:8px 29px 8px 10px;border:1px solid #d8c7d0;
+  padding-block:8px 8px;
+  padding-inline:10px 29px;border:1px solid #d8c7d0;
   border-radius:9px;background:#fff;color:#473641;font-size:12px;
 }
 #news .first.filter-bar .select-box .arrow-icon{
-  left:auto;right:9px;color:#86546c;pointer-events:none;
+  inset-inline-start:auto;inset-inline-end:9px;color:#86546c;pointer-events:none;
 }
 #news .first.filter-bar .add-btn{
   display:inline-flex;align-items:center;justify-content:center;
@@ -76,7 +78,7 @@
 #news .second{
   display:flex;align-items:center;justify-content:flex-start;
   gap:8px;flex-wrap:wrap;min-height:42px;margin:5px 0 10px;
-  width:100%;text-align:left;
+  width:100%;text-align:start;
 }
 #news .second button{
   display:inline-flex;align-items:center;justify-content:center;
@@ -159,7 +161,7 @@
 }
 #news .dart-record-dialog{
   width:min(910px,97vw);max-width:none;padding:0 22px 25px;
-  background:#fdfbfc;border-left:1px solid #e6d8e0;
+  background:#fdfbfc;border-inline-start:1px solid #e6d8e0;
 }
 #news .dart-record-dialog-head{
   position:sticky;top:0;z-index:3;display:flex;
@@ -194,7 +196,7 @@
   box-shadow:0 24px 60px #27142134;
 }
 .dart-news-editor #news-editor-title{
-  color:#452135;margin:0 34px 18px 0;
+  color:#452135;margin-block:0 18px;margin-inline:0 34px;
   font-size:22px;font-weight:800;
 }
 .dart-news-editor form{display:grid;gap:13px}
@@ -383,7 +385,8 @@
   border-radius:15px;background:#fffdfd;color:#382b35;
 }
 #dart-finance-modal .dart-finance-modal-head{
-  padding:0 30px 12px 0;margin:0 0 15px;border-bottom:1px solid #ede1e6;
+  padding-block:0 12px;
+  padding-inline:0 30px;margin:0 0 15px;border-bottom:1px solid #ede1e6;
 }
 #dart-finance-modal .dart-finance-modal-head h2{
   color:#492239;font-weight:800;font-size:21px;
@@ -642,7 +645,7 @@
 }
 @media(max-width:768px){
   #news.dashboard-section,#finance.dashboard-section,#settings.dashboard-section{
-    width:100%!important;margin-left:0!important;min-height:100dvh;
+    width:100%!important;margin-inline-start:0!important;min-height:100dvh;
     padding:16px 12px 100px!important;
   }
   #news .dart-workspace-badge{display:none}

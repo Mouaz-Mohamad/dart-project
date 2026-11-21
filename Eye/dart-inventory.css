@@ -82,7 +82,7 @@
   padding: 12px;
   background: #fff;
   position: sticky;
-  left: 0;
+  inset-inline-start: 0;
   white-space: normal;
 }
 .stock-badge {
@@ -349,3 +349,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Shared variant, one unique code per physical piece. */
+.dart-item-code-row { display: flex; align-items: center; gap: 8px; margin-block-end: 8px; }
+.dart-item-code-row input { flex: 1; min-width: 0; }
+.dart-item-code-row button { flex: 0 0 40px; min-height: 40px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--primary-color, #ab012b); color: #fff; font-size: 22px; cursor: pointer; }
+.dart-item-code-row button[hidden] { display: none; }

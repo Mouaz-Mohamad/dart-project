@@ -687,6 +687,8 @@
       s.required = true;
       old.replaceWith(s);
     }
+    const extraCodes = $("dart-item-extra-codes");
+    window.DartItemBatch.setup(form, $);
     const code = $("modal-item-model-id");
     code.addEventListener("input", () => populateItemOptions());
     document
@@ -712,10 +714,11 @@
         !C.sizes(m).some((s) => C.active(s) && s.name === size)
       )
         return window.DartDialog.alert("Choose an active model, color and size.");
+      const itemCodes = old ? [itemCode] : [itemCode, ...Array.from(extraCodes.querySelectorAll("input"), input => input.value.trim())];
+      if (itemCodes.some(value => !value) || new Set(itemCodes.map(C.norm)).size !== itemCodes.length)
+        return window.DartDialog.alert("Enter a different, non-empty code for every piece.");
       if (
-        itemsData.some(
-          (i) => C.norm(i.itemCode) === C.norm(itemCode) && i.id !== id,
-        )
+        itemsData.some(i => itemCodes.some(value => C.norm(i.itemCode) === C.norm(value)) && i.id !== id)
       )
         return window.DartDialog.alert("Item Code already exists.");
       if (
@@ -758,14 +761,19 @@
           isChecked: false,
           ...payload,
         };
-        await C.savePhysicalItem(candidate);
+        const candidates = itemCodes.map((value, index) => ({ ...candidate,
+          id: index === 0 ? newItemId : C.uid(), itemCode: value }));
+        if (candidates.length === 1) await C.savePhysicalItem(candidate);
+        else await C.savePhysicalItems(candidates);
         itemsData = C.items();
-        const saved = itemsData.find((row) => row.id === newItemId);
-        if (!saved || saved.itemCode !== itemCode || saved.modelId !== m.modelId ||
-            saved.color !== color || saved.size !== size) {
-          throw new Error("لم يتم تأكيد إضافة القطعة على السيرفر. راجع المخزون قبل المحاولة من جديد.");
+        for (const entry of candidates) {
+          const saved = itemsData.find((row) => row.id === entry.id);
+          if (!saved || saved.itemCode !== entry.itemCode || saved.modelId !== m.modelId ||
+              saved.color !== color || saved.size !== size) {
+            throw new Error("لم يتم تأكيد إضافة القطع على السيرفر. راجع المخزون قبل المحاولة من جديد.");
+          }
+          dartAudit(old ? "EDIT" : "CREATE", "items", entry.id, before || {}, entry);
         }
-        dartAudit(old ? "EDIT" : "CREATE", "items", newItemId, before || {}, payload);
         dartRefreshAll();
         refreshFilters();
         closeModal($("item-add-modal"));
@@ -863,7 +871,10 @@
       openModal($("model-modal"));
     } else {
       const i = itemsData.find((i) => i.id === id);
+      if ($("item-add-form").dataset.saving === "true") return;
       $("item-add-form").reset();
+      $("dart-item-extra-codes").replaceChildren();
+      $("dart-item-code-add").hidden = Boolean(i);
       const saveStatus = $("dart-item-save-status");
       if (saveStatus) saveStatus.textContent = "";
       $("modal-item-add-edit-id").value = id || "";

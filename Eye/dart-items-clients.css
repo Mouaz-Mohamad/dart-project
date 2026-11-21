@@ -52,23 +52,25 @@
 }
 #items .first.filter-bar .search-box input,#customers .first.filter-bar .search-box input{
   width:100%;min-height:42px;height:auto;
-  padding:10px 36px 10px 12px;border:1px solid #d9cbd3;border-radius:9px;
+  padding-block:10px 10px;
+  padding-inline:12px 36px;border:1px solid #d9cbd3;border-radius:9px;
   background:#fff;color:#42343d;font-size:12px;
 }
 #items .first.filter-bar .search-box i,#customers .first.filter-bar .search-box i{
-  left:auto;right:12px;color:#805069;opacity:.8;
+  inset-inline-start:auto;inset-inline-end:12px;color:#805069;opacity:.8;
 }
 #items .first.filter-bar .select-box,#customers .first.filter-bar .select-box{
   flex:1 1 135px;min-width:125px;width:auto;max-width:100%;
 }
 #items .first.filter-bar .select-box select,#customers .first.filter-bar .select-box select{
   display:block;width:100%;min-height:42px;height:auto;
-  padding:9px 30px 9px 11px;border:1px solid #d9cbd3;border-radius:9px;
+  padding-block:9px 9px;
+  padding-inline:11px 30px;border:1px solid #d9cbd3;border-radius:9px;
   background:#fff;color:#4d3b47;font-size:12px;
 }
 #items .first.filter-bar .select-box .arrow-icon,
 #customers .first.filter-bar .select-box .arrow-icon{
-  left:auto;right:9px;pointer-events:none;color:#7f5165;
+  inset-inline-start:auto;inset-inline-end:9px;pointer-events:none;color:#7f5165;
 }
 #items .first.filter-bar .add-btn,#customers .first.filter-bar .add-btn{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
@@ -103,7 +105,7 @@
 }
 #items .second,#customers .second{
   display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;
-  gap:8px;margin:0 0 12px;padding:0;min-height:40px;width:100%;text-align:left;
+  gap:8px;margin:0 0 12px;padding:0;min-height:40px;width:100%;text-align:start;
 }
 #items .second button,#customers .second button{
   display:inline-flex;align-items:center;justify-content:center;gap:7px;
@@ -238,7 +240,7 @@
 /* The customer's existing drawer is reused; summary content is not duplicated. */
 #customers .dart-record-dialog{
   width:min(940px,97vw);max-width:none;
-  background:#f9f7f8;padding:0 22px 30px;border-left:1px solid #e3d5dd;
+  background:#f9f7f8;padding:0 22px 30px;border-inline-start:1px solid #e3d5dd;
 }
 #customers .dart-record-dialog-head{
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
@@ -411,7 +413,7 @@
 }
 @media(max-width:768px){
   #items.dashboard-section,#customers.dashboard-section{
-    width:100%!important;margin-left:0!important;
+    width:100%!important;margin-inline-start:0!important;
     min-height:100dvh;padding:16px 12px 100px!important;
   }
   #items .dart-directory-badge,#customers .dart-directory-badge{display:none}

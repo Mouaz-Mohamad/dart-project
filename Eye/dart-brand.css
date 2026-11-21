@@ -111,13 +111,13 @@
   box-shadow:none;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
-  text-align:left;
+  text-align:start;
 }
 #brand .cards-one .cont-card-info-2>.card-inf-2:hover{border-color:#cdb5c0}
 #brand .cards-one .card-inf-2 h5{
   order:0;
   margin:0;
-  padding-right:21px;
+  padding-inline-end:21px;
   color:#736570;
   font-size:12px;
   font-weight:700;
@@ -158,7 +158,7 @@
 }
 #brand .cards-one .card-inf-2 .dart-info-btn{
   top:12px;
-  right:12px;
+  inset-inline-end:12px;
   width:19px;
   height:19px;
   min-width:19px;
@@ -265,7 +265,7 @@
   flex-wrap:wrap;
   gap:8px;
   min-width:0;
-  padding-right:17px;
+  padding-inline-end:17px;
 }
 #brand .chart-one .financial-summary h4{
   display:flex;
@@ -295,7 +295,7 @@
   padding:5px 8px;
   border-radius:20px;
   font-size:10px;
-  text-align:left;
+  text-align:start;
 }
 /* Preserve the financial comparison meaning: negative must remain red,
    positive green, and unchanged neutral. */
@@ -641,7 +641,7 @@
 #brand .chart-box-tow .note-item-tow{
   background:#faf5f7;
   color:#62515b;
-  border-right:3px solid #9d3152;
+  border-inline-end:3px solid #9d3152;
   border-radius:9px;
   font-size:12px;
 }
@@ -681,7 +681,7 @@
 }
 @media(max-width:768px){
   #brand.dashboard-section{
-    margin-left:0!important;
+    margin-inline-start:0!important;
     width:100%!important;
     min-height:100dvh;
     padding:16px 12px 100px!important;
@@ -701,7 +701,7 @@
     min-height:105px;
     padding:13px!important;
     border-radius:11px!important;
-    text-align:left!important;
+    text-align:start!important;
   }
   #brand .cards-one .card-inf-2 .span-img{
     flex-direction:row!important;
@@ -748,7 +748,7 @@
     min-height:115px;
     padding:11px!important;
     border-radius:10px!important;
-    text-align:left!important;
+    text-align:start!important;
     align-items:stretch!important;
     justify-content:space-between!important;
   }
@@ -760,7 +760,7 @@
   }
   #brand .chart-one .financial-summary .sales{
     font-size:clamp(14px,3.5vw,20px)!important;
-    text-align:left!important;
+    text-align:start!important;
     white-space:normal!important;
     overflow-wrap:anywhere;
     line-height:1.35!important;
@@ -771,7 +771,7 @@
     align-self:start;
     padding:4px 6px!important;
     font-size:9px!important;
-    text-align:left!important;
+    text-align:start!important;
   }
   #brand .chart-one>.dart-chart-card{
     width:100%!important;

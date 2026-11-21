@@ -17,5 +17,5 @@
 .dart-waiting-manual-dialog .manual-wait-submit{background:#ab012b;color:#fff;border:0;border-radius:9px;min-height:43px;font-weight:800}
 .dart-waiting-manual-dialog .manual-wait-submit:disabled{opacity:.55}
 .dart-waiting-manual-dialog #manual-wait-error{color:#ab012b;background:#fff1f2;padding:10px;border-radius:8px}
-.dart-waiting-manual-label{display:inline-block;margin-left:6px;padding:3px 7px;border-radius:8px;background:#f6e6ec;color:#852548;font-size:10px;font-weight:800}
+.dart-waiting-manual-label{display:inline-block;margin-inline-start:6px;padding:3px 7px;border-radius:8px;background:#f6e6ec;color:#852548;font-size:10px;font-weight:800}
 @media(max-width:420px){.dart-waiting-manual-dialog .manual-wait-pair{grid-template-columns:1fr}}

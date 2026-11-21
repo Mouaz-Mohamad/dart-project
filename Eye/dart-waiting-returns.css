@@ -92,23 +92,25 @@
 }
 #waiting .first.filter-bar .search-box input,#returns .first.filter-bar .search-box input{
   display:block;min-height:42px;height:auto;width:100%;
-  padding:10px 37px 10px 12px;border:1px solid #d9cbd2;border-radius:9px;
+  padding-block:10px 10px;
+  padding-inline:12px 37px;border:1px solid #d9cbd2;border-radius:9px;
   background:#fff;color:#45323e;font-size:12px;
 }
 #waiting .first.filter-bar .search-box i,#returns .first.filter-bar .search-box i{
-  left:auto;right:12px;color:#795064;opacity:.8;
+  inset-inline-start:auto;inset-inline-end:12px;color:#795064;opacity:.8;
 }
 #waiting .first.filter-bar .select-box,#returns .first.filter-bar .select-box{
   flex:1 1 145px;min-width:130px;max-width:100%;
 }
 #waiting .first.filter-bar .select-box select,#returns .first.filter-bar .select-box select{
   display:block;min-height:42px;height:auto;width:100%;
-  padding:8px 30px 8px 11px;border:1px solid #d9cbd2;border-radius:9px;
+  padding-block:8px 8px;
+  padding-inline:11px 30px;border:1px solid #d9cbd2;border-radius:9px;
   background:#fff;color:#443440;font-size:12px;cursor:pointer;
 }
 #waiting .first.filter-bar .select-box .arrow-icon,
 #returns .first.filter-bar .select-box .arrow-icon{
-  left:auto;right:9px;color:#82506b;pointer-events:none;
+  inset-inline-start:auto;inset-inline-end:9px;color:#82506b;pointer-events:none;
 }
 #waiting .dart-waiting-date{
   display:flex;flex:1 1 145px;align-items:center;justify-content:space-between;
@@ -248,7 +250,7 @@
 /* Returns: compact row summary + on-demand full record. */
 #returns .second{
   display:flex;align-items:center;justify-content:flex-start;
-  flex-wrap:wrap;gap:8px;min-height:42px;margin:9px 0 12px;padding:0;text-align:left;
+  flex-wrap:wrap;gap:8px;min-height:42px;margin:9px 0 12px;padding:0;text-align:start;
 }
 #returns .second button{
   display:inline-flex;justify-content:center;align-items:center;gap:7px;
@@ -391,7 +393,8 @@
   padding:23px;border:1px solid #e7d8e0;border-radius:14px;background:#fffdfd;
 }
 #return-approval-modal h3,#return-rejection-modal h3,#return-rep-assignment-modal h3{
-  margin:0 25px 12px 0;color:#4d2639;font-size:18px;line-height:1.5;
+  margin-block:0 12px;
+  margin-inline:0 25px;color:#4d2639;font-size:18px;line-height:1.5;
 }
 #return-approval-modal p,#return-rejection-modal p,#return-rep-assignment-modal p{
   color:#756473;font-size:12px;line-height:1.65;
@@ -418,7 +421,7 @@
 }
 @media(max-width:768px){
   #waiting.dashboard-section,#returns.dashboard-section{
-    width:100%!important;margin-left:0!important;
+    width:100%!important;margin-inline-start:0!important;
     min-height:100dvh;padding:16px 12px 100px!important;
   }
   #waiting .dart-waiting-head,#returns .dart-returns-header{gap:10px}

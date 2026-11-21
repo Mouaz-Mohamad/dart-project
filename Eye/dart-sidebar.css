@@ -17,7 +17,7 @@ body > .cont-menu {
   overflow: hidden;
   background: linear-gradient(162deg, #451726 0%, #2a1420 100%);
   background-image: linear-gradient(162deg, #451726 0%, #2a1420 100%);
-  border-right: 1px solid #ffffff17;
+  border-inline-end: 1px solid #ffffff17;
   box-shadow: 3px 0 26px #1a0c141b;
   transition: width .22s ease;
 }
@@ -116,7 +116,7 @@ body > .cont-menu {
   min-width: 0;
   min-height: 42px;
   padding: 10px 12px;
-  border-left: 3px solid transparent;
+  border-inline-start: 3px solid transparent;
   border-radius: 9px;
   color: #f4eaf0;
   background: transparent;
@@ -147,7 +147,7 @@ body > .cont-menu {
 }
 .cont-menu .menu li a[data-target].active {
   background: linear-gradient(95deg, #af1b47 0%, #7b1738 100%);
-  border-left-color: #f4ccd9;
+  border-inline-start-color: #f4ccd9;
   color: #fff;
   font-weight: 750;
   box-shadow: 0 3px 11px #1b071029;
@@ -188,9 +188,9 @@ body > .cont-menu {
 }
 .cont-menu #dart-admin-logout:not([hidden]):hover { background: #ffffff28; }
 main > .dashboard-section {
-  margin-left: var(--dart-sidebar-width);
+  margin-inline-start: var(--dart-sidebar-width);
   width: calc(100% - var(--dart-sidebar-width));
-  transition: margin-left .22s ease, width .22s ease;
+  transition: margin-inline-start .22s ease, width .22s ease;
 }
 body.dart-sidebar-collapsed > .cont-menu { padding-inline: 9px; }
 body.dart-sidebar-collapsed .cont-menu .dart-sidebar-brand {
@@ -228,7 +228,7 @@ body.dart-sidebar-collapsed .cont-menu #dart-admin-logout:not([hidden]) { paddin
 @media (max-width: 768px) {
   body { --dart-sidebar-width: 0px; }
   main > .dashboard-section {
-    margin-left: 0 !important;
+    margin-inline-start: 0 !important;
     width: 100% !important;
     transition: none;
   }
@@ -237,7 +237,7 @@ body.dart-sidebar-collapsed .cont-menu #dart-admin-logout:not([hidden]) { paddin
     display: flex !important;
     position: fixed;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     bottom: 0;
     width: min(292px, calc(100vw - 46px));
     height: 100vh;
@@ -355,13 +355,13 @@ body.dart-sidebar-collapsed .cont-menu #dart-admin-logout:not([hidden]) { paddin
   opacity: 1;
 }
 .cont-menu .dart-nav-unread[hidden], .nav-tow .dart-nav-unread[hidden], .dart-notification-bar .dart-nav-unread[hidden] { display: none; }
-body.dart-sidebar-collapsed .cont-menu .dart-nav-unread { position: absolute; top: 1px; right: 1px; min-width: 18px; height: 18px; font-size: 10px; }
-.nav-tow .dart-nav-unread { position: absolute; top: -3px; right: 0; min-width: 18px; height: 18px; font-size: 10px; }
+body.dart-sidebar-collapsed .cont-menu .dart-nav-unread { position: absolute; top: 1px; inset-inline-end: 1px; min-width: 18px; height: 18px; font-size: 10px; }
+.nav-tow .dart-nav-unread { position: absolute; top: -3px; inset-inline-end: 0; min-width: 18px; height: 18px; font-size: 10px; }
 .dart-notification-bar { position: sticky; top: 10px; z-index: 90; display: flex; justify-content: flex-end; margin: 0 16px; pointer-events: none; }
 .dart-notification-bar[hidden], .dart-notification-panel[hidden] { display: none; }
 .dart-notification-bar button, .dart-notification-panel { pointer-events: auto; }
 #dart-notification-bell { display: flex; align-items: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 10px; border: 1px solid #ffffff50; border-radius: 50px; background: #381724; color: #fff; box-shadow: 0 4px 16px #38172422; cursor: pointer; }
-.dart-notification-panel { position: absolute; top: 52px; right: 0; width: min(430px, calc(100vw - 36px)); max-height: min(650px, calc(100dvh - 130px)); overflow-y: auto; padding: 16px; border: 1px solid #e7dbe0; border-radius: 16px; background: #fffdf9; color: #26121b; box-shadow: 0 12px 40px #26121b30; }
+.dart-notification-panel { position: absolute; top: 52px; inset-inline-end: 0; width: min(430px, calc(100vw - 36px)); max-height: min(650px, calc(100dvh - 130px)); overflow-y: auto; padding: 16px; border: 1px solid #e7dbe0; border-radius: 16px; background: #fffdf9; color: #26121b; box-shadow: 0 12px 40px #26121b30; }
 .dart-inbox-heading, .dart-inbox-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .dart-inbox-heading h2 { font-size: 18px; margin: 0; }
 .dart-notification-panel button:not(.dart-inbox-row) { border: 1px solid #e7dbe0; border-radius: 8px; padding: 8px; background: #fff; color: #381724; cursor: pointer; }
@@ -376,3 +376,11 @@ body.dart-sidebar-collapsed .cont-menu .dart-nav-unread { position: absolute; to
 .dart-push-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eadfe3; }
 .dart-push-controls p, #dart-notification-status { font-size: 12px; line-height: 1.6; }
 .dart-notification-panel :focus-visible, #dart-notification-bell:focus-visible { outline: 2px solid #ab012b; outline-offset: 3px; }
+
+/* Drawer enters from the Arabic reading edge; open state keeps the same geometry. */
+@media (max-width: 768px) {
+  html[dir="rtl"] body:not(.dart-sidebar-mobile-open) > .cont-menu {
+    transform: translateX(105%);
+  }
+}
+html[dir="rtl"] .dart-sidebar-toggle i { transform: scaleX(-1); }
