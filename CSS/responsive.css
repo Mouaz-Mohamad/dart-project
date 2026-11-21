@@ -16,14 +16,6 @@
   .cart-banner-progress-fill { transition: none; }
 }
 
-@media (max-width: 380px) {
-  .cart-banner-link { padding: 11px 12px; }
-  .cart-banner-summary { gap: 8px; }
-  .cart-banner-count { min-width: 34px; height: 34px; font-size: 15px; }
-  .cart-banner-action strong { font-size: 14px; }
-  .cart-banner-price { font-size: 16px; }
-}
-
 @media (max-width: 370px) {
   .address-form .dart-birthday-selects { gap: 5px; }
   .address-form .dart-birthday-selects select { padding: 9px 18px 9px 7px; font-size: 11px; }

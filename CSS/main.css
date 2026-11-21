@@ -202,36 +202,32 @@ body.dart-scroll-header > .mother { overflow: clip; }
 body.dart-cart-bar-visible { padding-block-end: var(--dart-shopping-bar-space, 100px); }
 .cart-banner {
   position: fixed;
-  inset-inline: 15px;
-  bottom: 15px;
+  inset-inline: 7px;
+  bottom: 7px;
   width: auto;
   margin-inline: 0;
   display: flex;
   align-items: flex-start;
-  border: 1px solid #ffffff20;
-  border-radius: 32px;
-  background: var(--bragnte, #ab012b);
-  color: #fff;
-  box-shadow: 0 8px 32px #310b2638;
+  color: var(--bragnte, #ab012b);
   z-index: 400000;
   font-family: var(--font-main);
 }
-.cart-banner-expanded { border-radius: 22px; }
+.cart-banner.glass-effect { background: rgba(255, 255, 255, 0.82); }
 .cart-banner[hidden], .cart-banner [hidden] { display: none; }
-.cart-banner-link { flex: 1; min-width: 0; display: grid; padding: 12px 14px; color: inherit; text-decoration: none; }
-.cart-banner-summary { display: flex; align-items: center; gap: 10px; min-height: 40px; }
-.cart-banner-count { display: grid; place-items: center; flex-shrink: 0; min-width: 40px; height: 40px; padding-inline: 5px; border-radius: 50%; background: #0000001c; font-size: 17px; font-weight: 700; }
-.cart-banner-action { display: grid; gap: 2px; margin-inline-end: auto; }
-.cart-banner-action strong { color: inherit; font-size: 16px; line-height: 1.5; white-space: nowrap; }
-.cart-banner-feedback, .cart-banner-price-label { font-size: 10px; line-height: 1.6; color: #ffffffd9; }
+.cart-banner-link { flex: 1; min-width: 0; display: grid; padding: 4px 12px; color: inherit; text-decoration: none; }
+.cart-banner-summary { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.cart-banner-count { display: grid; place-items: center; flex-shrink: 0; min-width: 28px; height: 28px; padding-inline: 4px; border-radius: 50%; color: #fff; background: var(--bragnte, #ab012b); font-size: 14px; font-weight: 700; }
+.cart-banner-action { display: flex; align-items: center; gap: 4px; margin-inline-end: auto; }
+.cart-banner-action strong { color: inherit; font-size: 14px; line-height: 1.4; white-space: nowrap; }
+.cart-banner-feedback { font-size: 12px; line-height: 1; color: inherit; }
 .cart-banner-amount { min-width: 0; text-align: end; }
-.cart-banner-price { display: block; color: inherit; font-size: 18px; line-height: 1.4; font-weight: 700; overflow-wrap: anywhere; }
-.cart-banner-offer { display: grid; gap: 5px; padding-block-start: 12px; overflow-wrap: anywhere; }
-.cart-banner-offer-title { color: inherit; font-size: 14px; line-height: 1.6; }
-.cart-banner-detail { display: block; font-size: 12px; line-height: 1.7; color: #ffffffeb; }
-.cart-banner-close { flex-shrink: 0; border: 0; color: inherit; background: transparent; cursor: pointer; margin-block-start: 10px; margin-inline-end: 4px; width: 32px; height: 44px; font-size: 22px; border-radius: 16px; }
-.cart-banner-link:focus-visible, .cart-banner-close:focus-visible { outline: 3px solid #fff; outline-offset: -4px; }
-.cart-banner-progress { display: block; overflow: hidden; border-radius: 8px; height: 4px; width: 100%; margin-block-start: 4px; background: #ffffff38; }
+.cart-banner-price { display: block; color: inherit; font-size: 16px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
+.cart-banner-offer { display: grid; gap: 3px; padding-block-start: 6px; overflow-wrap: anywhere; }
+.cart-banner-offer-title { color: inherit; font-size: 12px; line-height: 1.5; }
+.cart-banner-detail { display: block; font-size: 11px; line-height: 1.5; color: inherit; }
+.cart-banner-close { flex-shrink: 0; border: 0; color: inherit; background: transparent; cursor: pointer; margin-inline-end: 2px; width: 32px; height: 42px; font-size: 20px; border-radius: 16px; }
+.cart-banner-link:focus-visible, .cart-banner-close:focus-visible { outline: 3px solid var(--bragnte, #ab012b); outline-offset: -4px; }
+.cart-banner-progress { display: block; overflow: hidden; border-radius: 8px; height: 4px; width: 100%; margin-block-start: 4px; background: #ab012b40; }
 .cart-banner-progress-fill { display: block; width: 100%; height: 100%; background: #fff; border-radius: inherit; transform: scaleX(0); transform-origin: right center; transition: transform 360ms ease; }
 
 .top {

@@ -32,36 +32,32 @@
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", installScrollHeader, { once: true });
   else installScrollHeader();
 
-  let node, link, heading, detail, progress, fill, offerCopy, count, price, priceLabel, feedback, live;
+  let node, link, heading, detail, progress, fill, offerCopy, count, price, feedback, live;
   let title = "", incentives = [], quote = null, version = 0, loading = false;
   let confirmationUntil = 0, timer = 0, refreshTimer = 0, dismissed = false, paused = false;
   const cart = () => { const lines = root.DartState?.read?.("dart_cart", []); return Array.isArray(lines) ? lines : []; };
   const options = () => root.DartSiteSettings?.get?.().shoppingBar || {};
   const duration = () => Math.min(30, Math.max(4, Number(options().durationSeconds) || 6)) * 1000;
+  const checkoutPage = () => /^\/cart-checkout(?:\.html)?\/?$/i.test(root.location?.pathname || "") ||
+    Boolean(doc.getElementById("cartView") || doc.getElementById("checkoutView"));
   function reserveSpace() {
-    const height = node && !node.hidden ? Math.ceil(node.getBoundingClientRect?.().height || 0) + 30 : 0;
+    const height = node && !node.hidden ? Math.ceil(node.getBoundingClientRect?.().height || 0) + 14 : 0;
     doc.documentElement?.style?.setProperty("--dart-shopping-bar-space", `${height}px`);
   }
   function ensure() {
     if (node) return;
-    node = doc.createElement("aside"); node.id = "cartBanner"; node.className = "cart-banner";
+    node = doc.createElement("aside"); node.id = "cartBanner"; node.className = "cart-banner glass-effect";
     node.dir = "rtl"; node.hidden = true; node.setAttribute("aria-label", "السلة والعروض المتاحة");
     link = doc.createElement("a"); link.className = "cart-banner-link"; link.href = "/cart-checkout.html";
-    link.addEventListener("click", event => {
-      const checkout = doc.getElementById?.("toCheckoutBtn");
-      if (!checkout || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      event.preventDefault(); checkout.click();
-    });
     const summary = doc.createElement("span"); summary.className = "cart-banner-summary";
     count = doc.createElement("span"); count.className = "cart-banner-count";
     const action = doc.createElement("span"); action.className = "cart-banner-action";
     const label = doc.createElement("strong"); label.textContent = "عرض السلة";
-    feedback = doc.createElement("span"); feedback.className = "cart-banner-feedback"; feedback.textContent = "تمت الإضافة ✓";
+    feedback = doc.createElement("span"); feedback.className = "cart-banner-feedback"; feedback.textContent = "✓"; feedback.setAttribute("aria-hidden", "true");
     action.append(label, feedback);
     const amount = doc.createElement("span"); amount.className = "cart-banner-amount";
     price = doc.createElement("bdi"); price.dir = "ltr"; price.className = "cart-banner-price";
-    priceLabel = doc.createElement("span"); priceLabel.className = "cart-banner-price-label";
-    amount.append(price, priceLabel); summary.append(count, action, amount);
+    amount.append(price); summary.append(count, action, amount);
     offerCopy = doc.createElement("span"); offerCopy.className = "cart-banner-offer";
     heading = doc.createElement("strong"); heading.className = "cart-banner-offer-title";
     detail = doc.createElement("span"); detail.className = "cart-banner-detail";
@@ -101,7 +97,7 @@
   }
   function render() {
     root.clearTimeout(timer);
-    if (dismissed || !doc.body || doc.hidden) return hide();
+    if (dismissed || !doc.body || doc.hidden || checkoutPage()) return hide();
     const offer = options().enabled === false ? null : incentives[0];
     const added = title && Date.now() < confirmationUntil;
     const quantity = cart().reduce((sum, line) => sum + (Number.isSafeInteger(line.quantity) && line.quantity > 0 ? line.quantity : 0), 0);
@@ -109,9 +105,9 @@
     ensure();
     count.textContent = String(quantity); count.setAttribute("aria-label", `${quantity} قطعة في السلة`);
     const minor = quantity ? itemTotal(quote) : 0;
-    price.textContent = minor === null ? (loading ? "…" : "—") : `${(minor / 100).toLocaleString("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+    price.textContent = minor === null ? (loading ? "…" : "—") : `${(minor / 100).toLocaleString("en-EG", { maximumFractionDigits: 0 })} ج.م`;
     price.setAttribute("aria-busy", String(loading));
-    priceLabel.textContent = minor === null ? (loading ? "جارٍ الحساب" : "راجع السلة") : "إجمالي القطع";
+    price.setAttribute("aria-label", minor === null ? (loading ? "جارٍ حساب السعر" : "السعر غير متاح، راجع السلة") : `${minor / 100} جنيه مصري`);
     feedback.hidden = !added;
     offerCopy.hidden = !offer;
     let progressTransform;
@@ -132,6 +128,7 @@
   }
   async function refresh() {
     const sequence = ++version;
+    if (checkoutPage()) { hide(); return; }
     incentives = []; quote = null; loading = Boolean(cart().length); render();
     try {
       let payload;
@@ -145,15 +142,19 @@
   }
   function changed() {
     ++version; incentives = []; quote = null; loading = Boolean(cart().length); dismissed = false;
+    root.clearTimeout(refreshTimer);
+    if (checkoutPage()) { hide(); return; }
     if (!cart().length) { title = ""; hide(); } else render();
-    root.clearTimeout(refreshTimer); refreshTimer = root.setTimeout(() => void refresh(), 180);
+    refreshTimer = root.setTimeout(() => void refresh(), 180);
   }
   function added(productTitle) {
+    if (checkoutPage()) { hide(); return; }
     title = String(productTitle || "المنتج").slice(0, 200); dismissed = false;
     confirmationUntil = Date.now() + duration(); render();
     root.clearTimeout(refreshTimer); void refresh();
   }
   function updateQuote(payload) {
+    if (checkoutPage()) { hide(); return; }
     if (!payload || root.DartPlatform?.currentCartQuote?.() !== payload) return;
     ++version; quote = payload; loading = false;
     incentives = Array.isArray(payload.incentives) ? payload.incentives : []; render();

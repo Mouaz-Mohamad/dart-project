@@ -12,10 +12,11 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"><meta name="vi
   <main style="height:5000px;padding:20px"><button id="preview-add">Add preview product</button><button id="preview-offer">Eligible reward</button><button id="preview-more">Complete reward</button><p>Isolated shopping feedback fixture</p></main>
   </div>
   <script>
-    let fixtureCart=[], fixtureOffer=false;
+    let fixtureCart=location.pathname.startsWith('/cart-checkout')?[{id:'preview-model',quantity:2}]:[], fixtureOffer=false;
+    window.fixtureQuoteCalls=0;
     window.DartState={read:()=>fixtureCart};
     window.DartSiteSettings={get:()=>({shoppingBar:{enabled:true,durationSeconds:6}})};
-    window.DartPlatform={currentUser:()=>null,quoteCart:async()=>({currency:'EGP',totalMinor:48490,shippingMinor:fixtureCart[0]?.quantity===3?0:10000,incentives:fixtureOffer?[{id:'preview',type:'freeShipping',title:'كمّل اختياراتك واستفيد',message:fixtureCart[0]?.quantity===3?'استفدت بالتوصيل المجاني':'فاضلك 1 قطعة وتستفيد بتوصيل مجاني على طلبك',target:3,current:fixtureCart[0]?.quantity,remaining:3-fixtureCart[0]?.quantity}]:[]})};
+    window.DartPlatform={currentUser:()=>null,quoteCart:async()=>{window.fixtureQuoteCalls++;return{currency:'EGP',totalMinor:48490,shippingMinor:fixtureCart[0]?.quantity===3?0:10000,incentives:fixtureOffer?[{id:'preview',type:'freeShipping',title:'كمّل اختياراتك واستفيد',message:fixtureCart[0]?.quantity===3?'استفدت بالتوصيل المجاني':'فاضلك 1 قطعة وتستفيد بتوصيل مجاني على طلبك',target:3,current:fixtureCart[0]?.quantity,remaining:3-fixtureCart[0]?.quantity}]:[]};}};
     document.getElementById('preview-add').onclick=()=>{fixtureCart=[{id:'preview-model',quantity:2}];window.DartShoppingBarReady('هودي Dart');};
     document.getElementById('preview-offer').onclick=()=>{fixtureOffer=true;window.DartShoppingBar.refresh();};
     document.getElementById('preview-more').onclick=()=>{fixtureCart=[{id:'preview-model',quantity:3}];window.dispatchEvent(new CustomEvent('dart:data-changed',{detail:{key:'dart_cart'}}));};
@@ -23,7 +24,7 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"><meta name="vi
   </script></body></html>`;
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, "http://fixture").pathname);
-  if (pathname === "/") { res.setHeader("Content-Type", "text/html; charset=utf-8"); res.end(fixture); return; }
+  if (pathname === "/" || /^\/cart-checkout(?:\.html)?$/.test(pathname)) { res.setHeader("Content-Type", "text/html; charset=utf-8"); res.end(fixture); return; }
   const file = path.resolve(root, "." + pathname);
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.statusCode = 404; res.end(); return; }
   const ext = path.extname(file);
@@ -42,20 +43,27 @@ const server = http.createServer((req, res) => {
       await page.locator("#preview-add").click();
       const bar = page.locator("#cartBanner"); await bar.waitFor({ state: "visible" });
       assert.equal(await page.locator(".mother").evaluate(el => getComputedStyle(el).overflow), "clip", "the production shell clips without trapping sticky positioning");
-      assert.equal(await bar.locator('.cart-banner-price').innerText(), '384.90 ج.م');
+      assert.equal(await bar.locator('.cart-banner-price').innerText(), '385 ج.م');
       assert.equal(await bar.locator('.cart-banner-count').innerText(), '2');
       assert.match(await bar.innerText(), /عرض السلة/);
       assert(!await bar.locator('.cart-banner-offer').isVisible());
       assert.equal(await bar.locator("a").getAttribute("href"), "/cart-checkout.html");
       const compact = await bar.boundingBox();
+      assert(compact.height <= 44.5, 'the one-row glass bar stays at most 44px high');
+      assert.equal(await bar.locator('.cart-banner-price-label').count(), 0);
+      assert(!(await bar.innerText()).includes('إجمالي القطع'));
       const checkFixed = async () => {
         const bounds = await bar.boundingBox();
         const viewportWidth = await page.evaluate(() => document.documentElement.clientWidth);
-        assert(Math.abs(bounds.x - 15) < 1 && Math.abs(viewportWidth - bounds.x - bounds.width - 15) < 1, 'exact 15px side insets within the viewport, excluding scrollbar chrome');
-        assert(Math.abs(900 - bounds.y - bounds.height - 15) < 1, 'exact 15px bottom inset');
+        assert(Math.abs(bounds.x - 7) < 1 && Math.abs(viewportWidth - bounds.x - bounds.width - 7) < 1, 'exact 7px side insets within the viewport, excluding scrollbar chrome');
+        assert(Math.abs(900 - bounds.y - bounds.height - 7) < 1, 'exact 7px bottom inset');
         assert.equal(await bar.evaluate(el => getComputedStyle(el).position), 'fixed');
-        assert.equal(await bar.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(171, 1, 43)');
-        assert(await page.evaluate(height => parseFloat(getComputedStyle(document.body).paddingBottom) >= height + 15, bounds.height), 'page content clears the fixed bar');
+        assert.equal(await bar.evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(255, 255, 255, 0.82)');
+        assert.equal(await bar.evaluate(el => getComputedStyle(el).backdropFilter), 'blur(4px)');
+        assert.equal(await bar.evaluate(el => getComputedStyle(el).color), 'rgb(171, 1, 43)');
+        assert.equal(await bar.locator('.cart-banner-count').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(171, 1, 43)');
+        assert.equal(await bar.locator('.cart-banner-count').evaluate(el => getComputedStyle(el).color), 'rgb(255, 255, 255)');
+        assert(await page.evaluate(height => parseFloat(getComputedStyle(document.body).paddingBottom) >= height + 7, bounds.height), 'page content clears the fixed bar');
       };
       await checkFixed();
       await page.locator('#preview-offer').click();
@@ -79,7 +87,7 @@ const server = http.createServer((req, res) => {
         return Math.abs(fill.width / track.width - 1) < .01;
       });
       assert.equal(await bar.locator('.cart-banner-count').innerText(), '3');
-      assert.equal(await bar.locator('.cart-banner-price').innerText(), '484.90 ج.م');
+      assert.equal(await bar.locator('.cart-banner-price').innerText(), '485 ج.م');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no page-level overflow");
       await page.mouse.move(width / 2, 350); await page.mouse.wheel(0, 1000);
       await page.waitForFunction(() => document.getElementById("header-container").classList.contains("dart-nav-hidden"));
@@ -95,6 +103,17 @@ const server = http.createServer((req, res) => {
       assert.equal(new URL(page.url()).pathname, '/cart-checkout.html', 'clicking the strip opens the cart');
       assert.deepEqual(errors, []); await page.close();
     }
-    console.log("PASS shopping layout at 320/370/480/767/768/1366: fixed 15px insets, server total/count, compact and expanded rewards, white progress geometry, cart navigation, sticky header, page clearance and overflow");
+    for (const destination of ['/cart-checkout.html?step=cart', '/cart-checkout?step=checkout#payment']) {
+      const page = await browser.newPage({viewport:{width:370,height:900}});
+      await page.goto(origin + destination, {waitUntil:'domcontentloaded'});
+      await page.waitForFunction(() => Boolean(window.DartShoppingBar));
+      await page.locator('#preview-add').click(); await page.locator('#preview-offer').click();
+      assert.equal(await page.locator('#cartBanner').count(), 0, 'cart and checkout never create the bar');
+      assert.equal(await page.evaluate(() => window.fixtureQuoteCalls), 0, 'hidden checkout bar adds no pricing requests');
+      assert.equal(await page.locator('#header-container').getAttribute('data-dart-scroll-header'), '1', 'checkout keeps the scroll navbar');
+      assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.body).paddingBottom)), 0, 'checkout has no bar spacing');
+      await page.close();
+    }
+    console.log("PASS shopping layout at 320/370/480/767/768/1366: 44px glass bar, 7px insets, burgundy text/white count, integer amount, reward progress, checkout suppression, cart navigation and scroll header");
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
