@@ -1113,3 +1113,7 @@ body[data-dart-density="compact"] .dart-compact-record {
 #settings #settings-content > .dart-infrastructure .dart-settings-accordion-category,
 #settings #settings-content > .dart-infrastructure .dart-settings-accordion-title { color: #68152d; }
 #settings #settings-content > .dart-infrastructure .dart-settings-accordion-hint { color: #171717; }
+
+/* Isolate infrastructure prose/actions from the legacy dashboard color cascade. */
+#settings #settings-content > .dart-infrastructure :is(p,label,small,dd,output) { color: #171717; }
+#settings #settings-content > .dart-infrastructure :is(h2,legend,dt,button) { color: #68152d; }

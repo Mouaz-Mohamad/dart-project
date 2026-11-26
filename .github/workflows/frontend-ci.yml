@@ -201,7 +201,7 @@ jobs:
             const env = file === 'css-cascade-browser.cjs'
               ? {...process.env, DART_CSS_BASE_REF: process.env.DART_CSS_BASE_REF || 'HEAD^'} : process.env;
             const result = spawnSync(process.execPath, [path.join('tests', file)], {stdio:'inherit',env});
-            if (result.error || result.status !== 0) failures.push(file);
+            if (result.error || result.status !== 0) {console.error('Failed browser suite:',file);process.exit(1);}
           }
           if (failures.length) {console.error('Failed browser suites:',failures.join(', '));process.exit(1);}
           console.log('PASS all',inventory.ciBrowser.length,'browser suites');

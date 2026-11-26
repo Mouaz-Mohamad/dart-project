@@ -72,13 +72,13 @@ const server = http.createServer((request, response) => {
           const rect = node.getBoundingClientRect();
           return { left: rect.left, right: rect.right, scroll: node.scrollWidth, client: node.clientWidth,
             color: getComputedStyle(node).color, background: getComputedStyle(node).backgroundColor,
-            textColors: [...node.querySelectorAll("p,label,small,button,h2,dt,dd,output")].filter(child => child.getClientRects().length).map(child => getComputedStyle(child).color) };
+            textColors: [...node.querySelectorAll("p,label,small,button,h2,dt,dd,output")].filter(child => child.getClientRects().length).map(child => ({ tag: child.tagName, id: child.id, color: getComputedStyle(child).color })) };
         });
         assert(geometry.left >= -1 && geometry.right <= width + 1, `${category} card exceeds viewport at ${width}px`);
         assert(geometry.scroll <= geometry.client + 1, `${category} contents overflow at ${width}px`);
         assert.equal(geometry.color, "rgb(23, 23, 23)");
         assert.equal(geometry.background, "rgb(255, 255, 255)", "The shared dashboard card surface stays white");
-        assert(geometry.textColors.every(color => ["rgb(23, 23, 23)", "rgb(104, 21, 45)"].includes(color)), "Text must stay black or burgundy");
+        assert(geometry.textColors.every(item => ["rgb(23, 23, 23)", "rgb(104, 21, 45)"].includes(item.color)), JSON.stringify({ category, width, textColors: geometry.textColors }));
       }
       await page.locator("#infrastructure-hosting-refresh").click();
       await page.waitForFunction(() => document.getElementById("infrastructure-hosting-usage").textContent.includes("17"));
