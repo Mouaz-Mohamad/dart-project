@@ -22,7 +22,7 @@ export const infrastructureSchema = z.object({
 export type InfrastructureSettings = z.infer<typeof infrastructureSchema>;
 export const DEFAULT_INFRASTRUCTURE: InfrastructureSettings = {
   schedule: { enabled: true, intervalMinutes: 15, quietEnabled: true, quietStart: "01:00", quietEnd: "12:00" },
-  calculator: { computeCu: 0.25, computeRateUsd: 0.106, freeAllowanceCuHours: 100, plan: "free", hostingBudgetUsd: 0 },
+  calculator: { computeCu: 0.25, computeRateUsd: 0.106, freeAllowanceCuHours: 0, plan: "paid", hostingBudgetUsd: 0 },
 };
 
 export function isQuietTime(schedule: InfrastructureSettings["schedule"], now = new Date()): boolean {

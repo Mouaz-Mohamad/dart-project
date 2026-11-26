@@ -28,14 +28,31 @@ export class InfrastructureProviders {
     const response = await this.call(`https://console.neon.tech/api/v2/projects/${encodeURIComponent(projectId)}`, token);
     if (!response.ok) return { available: false, reason: "NEON_USAGE_UNAVAILABLE" };
     const { project } = await response.json() as { project?: Record<string, unknown> };
-    const seconds = Number(project?.compute_time_seconds);
-    if (!Number.isFinite(seconds) || seconds < 0) return { available: false, reason: "NEON_USAGE_UNAVAILABLE" };
-    return { available: true, usedCuHours: seconds / 3600,
-      storageBytes: Number.isFinite(Number(project?.synthetic_storage_size)) ? Number(project?.synthetic_storage_size) : null,
-      transferBytes: Number.isFinite(Number(project?.data_transfer_bytes)) ? Number(project?.data_transfer_bytes) : null,
-      periodStart: project?.consumption_period_start || null, periodEnd: project?.consumption_period_end || null,
-      asOf: new Date().toISOString() };
+    if (!project || typeof project.org_id !== "string") return { available: false, reason: "NEON_PROJECT_UNAVAILABLE" };
+    const now = new Date(), start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const query = new URLSearchParams({ org_id: project.org_id, project_ids: projectId, from: start.toISOString(), to: end.toISOString(), granularity: "monthly", metrics: "compute_unit_seconds,public_network_transfer_bytes", limit: "1" });
+    const [usageResponse, endpointsResponse] = await Promise.all([
+      this.call(`https://console.neon.tech/api/v2/consumption_history/v2/projects?${query}`, token),
+      this.call(`https://console.neon.tech/api/v2/projects/${encodeURIComponent(projectId)}/endpoints`, token),
+    ]);
+    type Metric = { metric_name: string; value: number };
+    type Period = { period_plan: string; consumption: Array<{ metrics: Metric[] }> };
+    const usage = usageResponse.ok ? await usageResponse.json() as { projects?: Array<{ project_id: string; periods: Period[] }> } : null;
+    const selected = usage?.projects?.find(item => item.project_id === projectId);
+    const sum = (name: string) => selected ? selected.periods.reduce((total, period) => total + period.consumption.reduce((value, slot) => value + slot.metrics.filter(metric => metric.metric_name === name).reduce((v, metric) => v + metric.value, 0), 0), 0) : null;
+    const seconds = sum("compute_unit_seconds"), owner = project.owner as Record<string, unknown> | undefined;
+    const endpoints = endpointsResponse.ok ? await endpointsResponse.json() as { endpoints?: Array<Record<string, unknown>> } : null;
+    let databaseHost: string | undefined;
+    try { databaseHost = new URL(this.env.DATABASE_URL || this.env.POSTGRES_URL || "").hostname.replace("-pooler", ""); } catch { /* No configured production hostname. */ }
+    const endpointId = this.env.DART_NEON_ENDPOINT_ID || endpoints?.endpoints?.find(item => item.host === databaseHost)?.id;
+    const endpoint = endpointId ? endpoints?.endpoints?.find(item => item.id === endpointId) : endpoints?.endpoints?.length === 1 ? endpoints.endpoints[0] : undefined;
+    return { available: true, usedCuHours: seconds == null ? null : seconds / 3600,
+      account: { name: owner?.name || null, email: owner?.email || null, plan: owner?.subscription_type || null, project: project.name, projectId },
+      compute: endpoint ? { state: endpoint.current_state, minCu: endpoint.autoscaling_limit_min_cu, maxCu: endpoint.autoscaling_limit_max_cu, startedAt: endpoint.started_at || null, suspendSeconds: endpoint.suspend_timeout_seconds } : null,
+      transferBytes: sum("public_network_transfer_bytes"), periodStart: project.consumption_period_start || start.toISOString(), periodEnd: project.consumption_period_end || end.toISOString(),
+      asOf: now.toISOString() };
   }
+
   async hosting(now = new Date()) {
     const token = this.env.DART_VERCEL_READ_TOKEN, teamId = this.env.DART_VERCEL_TEAM_ID;
     const projects = (this.env.DART_VERCEL_PROJECT_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
@@ -44,6 +61,7 @@ export class InfrastructureProviders {
     // Each sub-result is independent: restricted billing permission must not hide deployment counts.
     const deployments = await Promise.all(projects.map(async projectId => {
       let until: string | undefined, count = 0;
+      try {
       for (let page = 0; page < 20; page++) {
         const query = new URLSearchParams({ teamId, projectId, since: String(start.getTime()), limit: "100", ...(until ? { until } : {}) });
         const response = await this.call(`https://api.vercel.com/v6/deployments?${query}`, token);
@@ -55,6 +73,7 @@ export class InfrastructureProviders {
         until = String(payload.pagination.next);
       }
       return { projectId, available: true, count, complete: false };
+      } catch { return { projectId, available: false, count: null, complete: false }; }
     }));
     let billedUsd: number | null = null;
     try {
@@ -74,7 +93,7 @@ export class InfrastructureProviders {
           while (true) {
             const chunk = await reader.read(); if (chunk.done) break;
             bytes += chunk.value.byteLength;
-            if (bytes > 5_000_000) { valid = false; await reader.cancel(); break; }
+            if (bytes > 32_000_000) { valid = false; await reader.cancel(); break; }
             pending += decoder.decode(chunk.value, { stream: true });
             let index: number;
             while ((index = pending.indexOf("\n")) >= 0) { collect(pending.slice(0, index)); pending = pending.slice(index + 1); }
@@ -84,19 +103,30 @@ export class InfrastructureProviders {
         } finally { reader.releaseLock(); }
       }
     } catch { /* Costs remain explicitly unavailable; deployment results are still useful. */ }
-    let requests: number | null = null;
-    try {
-      const response = await this.call(`https://api.vercel.com/v2/observability/query?teamId=${encodeURIComponent(teamId)}`, token, {
-        method: "POST", body: JSON.stringify({ metric: "vercel.request.count", aggregation: "sum",
-          scope: { type: "project", ownerId: teamId, projectIds: projects }, startTime: start.toISOString(), endTime: now.toISOString() }),
-      });
-      if (response.ok) {
-        const payload = await response.json() as { summary?: Array<{ vercel_request_count_sum?: number }> };
+    // Query each project independently: do not assume a provider supports multi-project scopes.
+    const requestCounts = await Promise.all(projects.map(async projectId => {
+      try {
+        const response = await this.call(`https://api.vercel.com/v2/observability/query?teamId=${encodeURIComponent(teamId)}`, token, {
+          method: "POST", body: JSON.stringify({ metric: "vercel.request.count", aggregation: "sum",
+            scope: { type: "project", ownerId: teamId, projectIds: [projectId] }, startTime: start.toISOString(), endTime: now.toISOString() }),
+        });
+        if (!response.ok) return null;
+        const payload = await response.json() as { summary?: Array<{ vercel_request_count_sum?: number }>; query?: { scope?: { projectIds?: string[] } } };
+        const scope = payload.query?.scope?.projectIds;
+        if (scope && (scope.length !== 1 || scope[0] !== projectId)) return null;
         const total = payload.summary?.[0]?.vercel_request_count_sum;
-        if (typeof total === "number" && Number.isFinite(total)) requests = total;
-      }
-    } catch { /* Observability may require a separate entitlement. */ }
-    return { available: true, deployments, billedUsd, requests, billingScope: "team", usageScope: "configured-projects",
+        return typeof total === "number" && Number.isFinite(total) && total >= 0 ? total : null;
+      } catch { return null; }
+    }));
+    const requests = requestCounts.every(value => value !== null) ? requestCounts.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
+    let account: { name: unknown; email: unknown; plan: unknown; team: unknown } | null = null;
+    try {
+      const [userResponse, teamResponse] = await Promise.all([this.call("https://api.vercel.com/v2/user", token), this.call(`https://api.vercel.com/v2/teams/${encodeURIComponent(teamId)}`, token)]);
+      const user = userResponse.ok ? (await userResponse.json() as { user?: Record<string, unknown> }).user : null;
+      const team = teamResponse.ok ? await teamResponse.json() as { name?: string; billing?: { plan?: string } } : null;
+      account = { name: user?.username || user?.name || null, email: user?.email || null, plan: team?.billing?.plan || null, team: team?.name || null };
+    } catch { /* Account metadata failure does not hide independently verified usage. */ }
+    return { available: true, account, deployments, billedUsd, requests, billingScope: "team", usageScope: "configured-projects",
       periodStart: start.toISOString(), periodEnd: now.toISOString(), asOf: new Date().toISOString(),
       note: "Calendar-month posted team charges; not a final invoice. May include Neon Marketplace charges." };
   }

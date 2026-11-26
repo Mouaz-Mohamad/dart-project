@@ -11,8 +11,8 @@ window.DartSiteSettings={hydrate:async()=>{}};
 window.DartSettingsTabs={refresh(){}};
 window.DartAdminApi={request:async(url,options)=>{
   fixtureCalls.push({url,options});
-  if(url.endsWith("/usage/database"))return {available:true,usedCuHours:110,storageBytes:54738944,periodEnd:"2026-12-01T00:00:00Z",asOf:"2026-11-26T00:00:00Z"};
-  if(url.endsWith("/usage/hosting"))return {available:true,billedUsd:8,requests:17,deployments:[{available:true,complete:true,count:4}],periodStart:"2026-11-01T00:00:00Z",asOf:"2026-11-26T00:00:00Z"};
+  if(url.endsWith("/usage/database"))return {available:true,account:{email:"owner@example.test",plan:"launch_v3"},compute:{state:"active",minCu:0.25,maxCu:8,startedAt:"2026-11-26T15:46:15Z",suspendSeconds:0},usedCuHours:110,storageBytes:54738944,periodEnd:"2026-12-01T00:00:00Z",asOf:"2026-11-26T00:00:00Z"};
+  if(url.endsWith("/usage/hosting"))return {available:true,account:{email:"owner@example.test",team:"Dart",plan:"pro"},billedUsd:8,requests:17,deployments:[{available:true,complete:true,count:4}],periodStart:"2026-11-01T00:00:00Z",asOf:"2026-11-26T00:00:00Z"};
   if(url.endsWith("/process"))return {published:2,failed:0};
   if(options?.method==="PUT"){if(options.body.expectedRevision!==fixturePayload.revision)throw {status:409};fixturePayload={...fixturePayload,revision:fixturePayload.revision+1,settings:options.body.settings};}
   return structuredClone(fixturePayload);
@@ -55,6 +55,10 @@ const server = http.createServer((request, response) => {
       assert.equal(await page.locator("#infra-interval").inputValue(), "15");
       assert.equal(await page.locator("#infra-start").inputValue(), "01:00");
       assert.equal(await page.locator("#infra-end").inputValue(), "12:00");
+      assert.equal(await page.locator(".dart-infra-details").getAttribute("open"), null, "Calculator starts collapsed");
+      await page.waitForFunction(() => document.getElementById("infrastructure-database-usage").textContent.includes("owner@example.test"));
+      assert.match(await page.locator("#infrastructure-database-usage").innerText(), /Launch.*مدفوعة/s);
+      assert.match(await page.locator("#infrastructure-database-usage").innerText(), /النوم بعد الخمول\s*5 دقيقة/s);
       await page.locator("#infra-interval").fill("30");
       await page.locator("#infra-start").fill("02:00");
       await page.locator("#infra-end").fill("11:00");
@@ -82,6 +86,8 @@ const server = http.createServer((request, response) => {
       }
       await page.locator("#infrastructure-hosting-refresh").click();
       await page.waitForFunction(() => document.getElementById("infrastructure-hosting-usage").textContent.includes("17"));
+      assert.match(await page.locator("#infrastructure-hosting-usage").innerText(), /Dart.*Pro/s);
+      if (width === 370 || width === 1440) await page.screenshot({path: `/tmp/dart-infrastructure-${width}.png`, fullPage:true});
       assert.deepEqual(errors, []);
       await page.close();
     }

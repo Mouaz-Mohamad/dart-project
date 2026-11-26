@@ -54,7 +54,7 @@ export class InfrastructureService {
     const task = (async () => {
       try {
         const value = await (kind === "database" ? this.providers.neon() : this.providers.hosting());
-        this.metrics.set(kind, { expires: Date.now() + 60_000, value }); return value;
+        this.metrics.set(kind, { expires: Date.now() + (kind === "database" ? 15 * 60_000 : 5 * 60_000), value }); return value;
       } catch { return { available: false, reason: "PROVIDER_UNAVAILABLE" }; }
       finally { this.pending.delete(kind); }
     })();

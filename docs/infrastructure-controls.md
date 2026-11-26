@@ -87,3 +87,28 @@ Visual inspection through the connected browser could not reach the isolated exe
 The first production attempt correctly stopped on the legacy CSS equivalence test: it applied old styles to the newly added infrastructure cards. The equivalence fixture now removes only the two new cards and their new navigation buttons from both phases, following the existing merchandising/checkout fixture pattern. All legacy elements retain their full computed-style, geometry and pixel comparisons.
 
 `infrastructure-settings-browser.cjs` independently exercises the real delivered dashboard markup, stylesheet cascade and infrastructure runtime at 370, 480, 767, 768 and 1440 pixels. It checks card/content overflow, black/burgundy text, default and editable intervals/quiet hours, acknowledged saves, on-demand provider reads and denied access. It uses only synthetic local API responses. It is wired into the maintained browser inventory and the same required Frontend CI gate.
+
+## Account dashboard revision (unpublished)
+
+- Verified Neon plan: Launch, managed by the Dart Vercel team. Use v2 project consumption; legacy project counters returned zero while v2 returned real consumption.
+- Compact account and usage tiles precede timing controls. Calculator is collapsed and paid by default. Current compute start time is separate from monthly CU-hours. Select production compute by explicit endpoint ID or backend database hostname.
+- Provider reads occur on tab opening or manual refresh, with no new background polling. No fabricated balance or free quota.
+- All three provider/scheduler token variables are present as Production/Sensitive; identifiers are configured. Runtime validity must still be checked after deployment.
+- Checks: 69 frontend checks, 14 isolated infrastructure backend tests and backend typecheck pass. Browser layout verification remains pending; the executor blocks Chromium startup; browser acceptance runs on the no-deploy review branch before production.
+
+| Review | Status |
+| --- | --- |
+| 1. Loading/empty/error states | Pass; unavailable values stay separate from zero |
+| 2. Server authority | Pass; provider identities/usage and PostgreSQL revisions |
+| 3. Concurrency | Pass; existing serialization/coalescing preserved |
+| 4. Validation/access | Pass; staff permission/MFA/CSRF unchanged |
+| 5. Idempotency | Pass; existing manual outbox path unchanged |
+| 6. Audit | Pass; existing audited save/manual operations preserved |
+| 7. Costs | Pass; no paid messages/new subscriptions used as tests; no polling added |
+| 8. Regression | Static checks pass; browser verification pending executor limitation |
+| 9. Tests | 69 frontend checks, 14 focused backend tests and 1,031 backend tests pass (68 existing skips); browser gate still required |
+| 10. Secrets | Pass; server-only Sensitive token, no values read or logged |
+
+The existing `work/database-hosting-controls` branch has Vercel deployment disabled in both projects. Frontend CI now runs there, so the redesigned surfaces can pass browser checks before moving the approved commit to main without a preview deployment.
+
+Neon endpoint timeout semantics: `0` selects the documented five-minute default; only `-1` disables automatic suspension. The UI fixture and runtime test cover this distinction.

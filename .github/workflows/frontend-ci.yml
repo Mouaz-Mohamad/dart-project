@@ -4,7 +4,7 @@ name: Frontend CI
 
 on:
   push:
-    branches: [main, full-code-cleanup]
+    branches: [main, full-code-cleanup, work/database-hosting-controls]
     tags: [dart-review-*]
     paths:
       - "*.html"
