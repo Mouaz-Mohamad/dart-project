@@ -81,3 +81,9 @@ Visual inspection through the connected browser could not reach the isolated exe
 - [GitHub repository Actions variables](https://docs.github.com/en/rest/actions/variables)
 - [Vercel billing charges JSONL](https://vercel.com/changelog/access-billing-usage-cost-data-api)
 - [Neon pricing](https://neon.com/pricing)
+
+## Release verification update
+
+The first production attempt correctly stopped on the legacy CSS equivalence test: it applied old styles to the newly added infrastructure cards. The equivalence fixture now removes only the two new cards and their new navigation buttons from both phases, following the existing merchandising/checkout fixture pattern. All legacy elements retain their full computed-style, geometry and pixel comparisons.
+
+`infrastructure-settings-browser.cjs` independently exercises the real delivered dashboard markup, stylesheet cascade and infrastructure runtime at 370, 480, 767, 768 and 1440 pixels. It checks card/content overflow, black/burgundy text, default and editable intervals/quiet hours, acknowledged saves, on-demand provider reads and denied access. It uses only synthetic local API responses. It is wired into the maintained browser inventory and the same required Frontend CI gate.

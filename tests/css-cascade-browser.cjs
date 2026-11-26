@@ -190,6 +190,12 @@ async function initialize(page, origin, file, phase) {
     document.getElementById('productQuantityOffer')?.remove();
     document.getElementById('productRelatedModels')?.remove();
     document.getElementById('modal-related-models')?.closest('.form-group')?.remove();
+    // These newly introduced Settings surfaces have no pre-feature CSS baseline.
+    // infrastructure-settings-browser.cjs checks their real delivered markup,
+    // responsive geometry, brand text colors and interactions at all five widths.
+    // Keep every legacy dashboard surface in the equivalence comparison.
+    for (const id of ['settings-database-card', 'settings-hosting-card',
+      'settings-tab-database', 'settings-tab-hosting']) document.getElementById(id)?.remove();
     // Populate the static product and leaderboard templates without API writes.
     const card = document.getElementById('productTemplate');
     if (card) {
