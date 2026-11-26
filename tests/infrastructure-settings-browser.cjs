@@ -77,7 +77,7 @@ const server = http.createServer((request, response) => {
         assert(geometry.left >= -1 && geometry.right <= width + 1, `${category} card exceeds viewport at ${width}px`);
         assert(geometry.scroll <= geometry.client + 1, `${category} contents overflow at ${width}px`);
         assert.equal(geometry.color, "rgb(23, 23, 23)");
-        assert.equal(geometry.background, "rgb(255, 253, 248)");
+        assert.equal(geometry.background, "rgb(255, 255, 255)", "The shared dashboard card surface stays white");
         assert(geometry.textColors.every(color => ["rgb(23, 23, 23)", "rgb(104, 21, 45)"].includes(color)), "Text must stay black or burgundy");
       }
       await page.locator("#infrastructure-hosting-refresh").click();
