@@ -1105,3 +1105,11 @@ body[data-dart-density="compact"] .dart-compact-record {
 #settings .dart-infrastructure-metrics dd {margin:0;}
 #settings .dart-infrastructure-actions {display:flex;flex-wrap:wrap;gap:10px;}
 #settings .dart-infrastructure [data-error="true"] {color:#68152d;}
+
+/* Keep infrastructure controls in full-width rows, including before accordion initialization. */
+#settings #settings-content > .dart-infrastructure > :not(.dart-settings-card-icon):not(.dart-settings-card-copy):not(.dart-settings-accordion-trigger) { grid-column: 1 / -1; min-width: 0; }
+#settings #settings-content > .dart-infrastructure form > fieldset { grid-column: 1 / -1; }
+#settings #settings-content > .dart-infrastructure .dart-settings-accordion-trigger,
+#settings #settings-content > .dart-infrastructure .dart-settings-accordion-category,
+#settings #settings-content > .dart-infrastructure .dart-settings-accordion-title { color: #68152d; }
+#settings #settings-content > .dart-infrastructure .dart-settings-accordion-hint { color: #171717; }

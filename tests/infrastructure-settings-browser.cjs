@@ -26,7 +26,7 @@ for(const tab of document.querySelectorAll("[data-settings-tab]"))tab.addEventLi
 });
 `;
 const html = original.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-  .replace("</body>", '<script src="/__infrastructure-fixture.js"></script><script src="/Js/dart-dialog.js"></script><script src="/Eye/dart-infrastructure.js"></script></body>');
+  .replace("</body>", '<script src="/__infrastructure-fixture.js"></script><script src="/Js/dart-dialog.js"></script><script src="/Eye/dart-settings-accordion.js"></script><script src="/Eye/dart-infrastructure.js"></script></body>');
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, "http://fixture").pathname);
   if (pathname === "/Eye/Dart Eye.html") { response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(html); return; }
@@ -50,6 +50,7 @@ const server = http.createServer((request, response) => {
       await page.goto(origin + "/Eye/Dart%20Eye.html", { waitUntil: "networkidle" });
       assert.equal(await page.evaluate(() => fixtureCalls.length), 0, "Settings opening must not poll providers");
       await page.locator("#settings-tab-database").click();
+      await page.locator("#settings-database-card > .dart-settings-accordion-trigger").click();
       await page.locator("#infra-interval").waitFor({ state: "visible" });
       assert.equal(await page.locator("#infra-interval").inputValue(), "15");
       assert.equal(await page.locator("#infra-start").inputValue(), "01:00");
@@ -66,6 +67,7 @@ const server = http.createServer((request, response) => {
         await page.locator(`#settings-tab-${category}`).click();
         const card = page.locator(`#settings-${category}-card`);
         await card.waitFor({ state: "visible" });
+        await card.locator(":scope > .dart-settings-accordion-trigger").click();
         const geometry = await card.evaluate(node => {
           const rect = node.getBoundingClientRect();
           return { left: rect.left, right: rect.right, scroll: node.scrollWidth, client: node.clientWidth,
