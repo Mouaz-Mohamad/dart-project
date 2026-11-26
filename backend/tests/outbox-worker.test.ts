@@ -35,7 +35,7 @@ fs.writeFileSync(target, JSON.stringify({ configured: true, claimed: full || pro
 `, { mode: 0o700 });
     const result = spawnSync("bash", ["-c", script], { encoding: "utf8", timeout: 30000,
       env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, DART_OUTBOX_CRON_SECRET: "isolated-worker-secret".repeat(2),
-        DART_TEST_COUNTER: counter, DART_TEST_MODE: mode } });
+        DART_POLICY_REVISION: "0", DART_TEST_COUNTER: counter, DART_TEST_MODE: mode } });
     const calls = readFileSync(counter, "utf8").trim().split("\n").length;
     return { status: result.status, calls, output: `${result.stdout}${result.stderr}` };
   } finally { rmSync(directory, { recursive: true, force: true }); }

@@ -872,7 +872,7 @@
 
   function startPolling() {
     clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => void refresh(), POLL_MS);
+    refreshTimer = setInterval(() => { if (window.DartBackgroundPolicy?.allows?.() !== false) void refresh(); }, POLL_MS);
     void refresh({ force: true });
   }
 

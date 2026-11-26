@@ -390,7 +390,7 @@
   });
   // Five-minute version fallback only when the live stream is unavailable.
   setInterval(() => {
-    if (!root.DartChanges?.active && !document.hidden && can("waiting.view") &&
+    if (root.DartBackgroundPolicy?.allows?.() !== false && !root.DartChanges?.active && !document.hidden && can("waiting.view") &&
       $("waiting")?.classList.contains("active-section")) void hydrate(false);
   }, 300000);
 

@@ -832,8 +832,8 @@
       void refreshLiveTracking();
     }
   });
-  setInterval(() => void refreshLiveTracking(), LIVE_LOCATION_POLL_MS);
-  setInterval(() => void refreshServerTracking(), SNAPSHOT_REFRESH_MS);
+  setInterval(() => { if (window.DartBackgroundPolicy?.allows?.() !== false) void refreshLiveTracking(); }, LIVE_LOCATION_POLL_MS);
+  setInterval(() => { if (window.DartBackgroundPolicy?.allows?.() !== false) void refreshServerTracking(); }, SNAPSHOT_REFRESH_MS);
 
 })();
 

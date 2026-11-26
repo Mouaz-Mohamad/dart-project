@@ -483,6 +483,7 @@
     }
   });
   window.setInterval(() => {
+    if (window.DartBackgroundPolicy?.allows?.() === false) return;
     if (!window.DartChanges?.active) return checkAll();
     // Keep failed local writes recoverable without polling unrelated server data.
     if (adminPollingEnabled && !document.hidden && dirty.size) return Promise.all([...dirty].map(domain => checkDomain(domain)));

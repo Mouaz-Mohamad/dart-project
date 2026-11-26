@@ -1,5 +1,6 @@
 // DART CODE GUIDE | backend/src/modules/settings/site-settings.service.ts
 // الغرض: منطق أعمال خادمي؛ ينفذ القواعد ويقرأ/يكتب PostgreSQL بدل الثقة في المتصفح.
+import { DEFAULT_INFRASTRUCTURE, infrastructureSchema, type InfrastructureSettings } from "./infrastructure-policy.js";
 import type { Pool } from "pg";
 import { AppError } from "../../http/app-error.js";
 import { publicSiteSettings, siteSettingsSchema } from "./site-settings.schema.js";
@@ -10,15 +11,19 @@ export class SiteSettingsService {
 
   public async get(
     includePrivate = false,
-  ): Promise<{ version: number; settings: Record<string, unknown> }> {
+  ): Promise<{ version: number; settings: Record<string, unknown>; backgroundSchedule: InfrastructureSettings["schedule"] }> {
     const result = await this.pool.query<{ version: string; data: Record<string, unknown> }>(
       "SELECT version::text, data FROM site_settings WHERE id='main'",
     );
     const row = result.rows[0];
-    const settings = row?.data || {};
+    const settings = { ...(row?.data || {}) };
+    const infrastructure = infrastructureSchema.parse(settings.infrastructure || DEFAULT_INFRASTRUCTURE);
+    delete settings.infrastructure; delete settings.infrastructureRevision;
+
     return {
       version: Number(row?.version || 1),
       settings: includePrivate ? settings : publicSiteSettings(settings),
+      backgroundSchedule: infrastructure.schedule,
     };
   }
 
@@ -27,7 +32,7 @@ export class SiteSettingsService {
     settingsInput: Record<string, unknown>,
     actorId: string,
     requestId: string,
-  ): Promise<{ version: number; settings: Record<string, unknown> }> {
+  ): Promise<{ version: number; settings: Record<string, unknown>; backgroundSchedule: InfrastructureSettings["schedule"] }> {
     const parsedSettings = siteSettingsSchema.parse(settingsInput);
     const client = await this.pool.connect();
     try {
@@ -178,7 +183,10 @@ export class SiteSettingsService {
         ],
       );
       await client.query("COMMIT");
-      return { version: next, settings: nextSettings };
+      const responseSettings = { ...nextSettings };
+      const infrastructure = infrastructureSchema.parse(responseSettings.infrastructure || DEFAULT_INFRASTRUCTURE);
+      delete responseSettings.infrastructure; delete responseSettings.infrastructureRevision;
+      return { version: next, settings: responseSettings, backgroundSchedule: infrastructure.schedule };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

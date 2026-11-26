@@ -1689,7 +1689,7 @@ window.setTimeout(() => {
 }, 2500);
 if (document.getElementById('reviewsContainer')) {
     window.setInterval(() => {
-        if (!document.hidden) void hydratePublicReviews();
+        if (!document.hidden && window.DartBackgroundPolicy?.allows?.() !== false) void hydratePublicReviews();
     }, 30000);
     window.addEventListener('focus', () => void hydratePublicReviews());
 }

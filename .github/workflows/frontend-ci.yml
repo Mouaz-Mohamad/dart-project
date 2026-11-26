@@ -156,6 +156,8 @@ jobs:
           node tests/admin-notifications-runtime.cjs
           node tests/admin-ar-localization.test.cjs
           node tests/settings-accordion-contract.cjs
+          node tests/background-schedule-runtime.cjs
+          node tests/infrastructure-settings-runtime.cjs
           node tests/test-inventory-contract.cjs
 
   browser-smoke:

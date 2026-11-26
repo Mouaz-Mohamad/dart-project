@@ -136,7 +136,7 @@
     window.addEventListener("dart:admin-logged-out",()=>{active=false;sequence++;showNav();});
     document.addEventListener("visibilitychange",()=>{if(!document.hidden&&active)void refresh();});
     // Limit reads to the visible WhatsApp section; never poll every few seconds.
-    setInterval(()=>{if(active&&!document.hidden)void refresh();},60000);
+    setInterval(()=>{if(window.DartBackgroundPolicy?.allows?.()!==false&&active&&!document.hidden)void refresh();},60000);
     showNav();active=section.classList.contains("active-section");if(active)void refresh();
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();

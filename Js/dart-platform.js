@@ -1,4 +1,4 @@
-/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:6b224f6870d5489d35bd27470e5868c3247847beac4ba3b5d6faf69efba6e8b6 */
+/* Generated from src/runtime-layout.json; edit its listed sources. source-sha256:859c09795e8e94a129e71aec08c19eac4c8a4ea8074f7e098a9279ebc7fab69d */
 (function () {
   "use strict";
 
@@ -4360,10 +4360,10 @@
     updateCartReservationTimer();
   }, 1000);
   setInterval(() => {
-    if (!document.hidden) void hydratePublicLeaderboard();
+    if (!document.hidden && window.DartBackgroundPolicy?.allows?.() !== false) void hydratePublicLeaderboard();
   }, 30000);
   setInterval(async () => {
-    if (!document.hidden && currentUser()) {
+    if (!document.hidden && currentUser() && window.DartBackgroundPolicy?.allows?.() !== false) {
       try {
         await hydrateCustomerCommerce();
         await hydrateWaiting();
@@ -4380,7 +4380,7 @@
     redirectRememberedCustomer();
   }
   setInterval(() => {
-    if (Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
+    if (window.DartBackgroundPolicy?.allows?.() !== false && Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
   }, 60000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) void recheckCustomerSession(); });
   window.addEventListener("focus", () => {

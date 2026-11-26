@@ -17,7 +17,7 @@
     source?.close(); source = null;
   }
   async function connect() {
-    if (source || !authenticated || document.hidden || navigator.onLine === false) return;
+    if (source || !authenticated || document.hidden || navigator.onLine === false || window.DartBackgroundPolicy?.allows?.() === false) return;
     const probeEpoch = epoch;
     if (!capability) capability = fetch(base + "/api/v1/health/live", { cache: "no-store" })
       .then(response => response.ok ? response.json() : null)
@@ -88,5 +88,11 @@
   window.addEventListener("online", () => { stop(); connect(); });
   window.addEventListener("pagehide", stop);
   window.addEventListener("pageshow", connect);
+  // Poll only the local clock so streams close at quiet start and resume after quiet end.
+  window.setInterval?.(() => {
+    if (window.DartBackgroundPolicy?.allows?.() === false) stop();
+    else if (!source && !retryTimer) void connect();
+  }, 60000);
+  window.addEventListener("dart:site-settings-changed", () => { if (window.DartBackgroundPolicy?.allows?.() === false) stop(); else void connect(); });
   connect();
 })();

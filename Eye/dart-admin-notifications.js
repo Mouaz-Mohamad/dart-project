@@ -212,7 +212,7 @@
   }
   function scheduleFallback() {
     clearTimeout(fallbackTimer);
-    fallbackTimer = setTimeout(() => { if (!window.DartChanges?.active) void refresh(); void syncPush(); scheduleFallback(); }, 60000);
+    fallbackTimer = setTimeout(() => { if (window.DartBackgroundPolicy?.allows?.() !== false) { if (!window.DartChanges?.active) void refresh(); void syncPush(); } scheduleFallback(); }, 60000);
   }
   document.getElementById("dart-notification-bell").addEventListener("click", () => showPanel(panel.hidden));
   document.getElementById("dart-notification-close").addEventListener("click", () => showPanel(false));

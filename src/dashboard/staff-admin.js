@@ -441,7 +441,7 @@
   });
   // Staff is rarely edited: reconcile at most every ten minutes without SSE.
   window.setInterval(() => {
-    if (!window.DartChanges?.active && !document.hidden &&
+    if (window.DartBackgroundPolicy?.allows?.() !== false && !window.DartChanges?.active && !document.hidden &&
         card.getClientRects().length && can("staff.read")) void load(true);
   }, 600000);
   window.addEventListener("dart:admin-authenticated", load);

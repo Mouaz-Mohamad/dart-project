@@ -11,6 +11,7 @@ Edit the sources here. Browser URLs continue to use `Js/` and `Eye/`.
 | `dashboard/item-batch.js` | Dashboard-only code fields and transactional batch save | `Eye/dart-item-batch.js` |
 | `dashboard/inventory.js` | Inventory, model and item editor UI | `Eye/dart-inventory.js` |
 | `dashboard/shipping-ui.js` | Shipping Companies tabs and editor presentation | `Eye/dart-shipping-ui.js` |
+| `dashboard/infrastructure.js` | Lazy database/hosting settings, scheduler controls and usage estimates | `Eye/dart-infrastructure.js` |
 | `dashboard/settings.js` | Settings forms and data reset UI | `Eye/dart-settings.js` |
 | `storefront/checkout-regions.js` | Checkout and return pickup region selectors | `Js/dart-checkout-regions.js` |
 | `dashboard/staff-admin.js` | Staff editor | `Eye/dart-staff.js` |

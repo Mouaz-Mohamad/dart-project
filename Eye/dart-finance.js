@@ -1676,7 +1676,7 @@
       ? Math.floor(Math.random() * Math.min(5_000, delayMs * 0.1))
       : 0;
     serverFinanceRefreshTimer = root.setTimeout(
-      () => void refreshFinanceFromServer(true),
+      () => { if (root.DartBackgroundPolicy?.allows?.() === false) scheduleFinanceRefresh(60_000); else void refreshFinanceFromServer(true); },
       delayMs + jitter,
     );
   }

@@ -846,7 +846,7 @@
   const tabs = [...document.querySelectorAll("[data-settings-tab]")];
   if (!content || !tabs.length) return;
 
-  const allowed = new Set(["general", "storefront", "sales", "loyalty", "staff", "maintenance"]);
+  const allowed = new Set(["general", "storefront", "sales", "loyalty", "staff", "maintenance", "database", "hosting"]);
 
   function activateSettingsTab(requested) {
     const target =

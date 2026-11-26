@@ -413,6 +413,6 @@
     if(!root.document.hidden && currentView==="sets" && dashboardControls().section?.classList.contains("active-section"))
       void loadSets(true);
   });
-  root.setInterval(()=>{if(!root.DartChanges?.active&&!root.document.hidden&&currentView==="sets"&&dashboardControls().section?.classList.contains("active-section"))void loadSets(false);},freshnessMs);
+  root.setInterval(()=>{if(root.DartBackgroundPolicy?.allows?.()!==false&&!root.DartChanges?.active&&!root.document.hidden&&currentView==="sets"&&dashboardControls().section?.classList.contains("active-section"))void loadSets(false);},freshnessMs);
   if(root.DartAdminHydration?.ready===true)init();
 })(typeof window!=="undefined"?window:globalThis);

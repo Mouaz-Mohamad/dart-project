@@ -289,5 +289,10 @@
       "source": "/api/:path*",
       "destination": "https://dart-api-dusky.vercel.app/api/:path*"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "work/database-hosting-controls": false
+    }
+  }
 }

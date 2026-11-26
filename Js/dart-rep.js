@@ -1109,6 +1109,7 @@
   }
 
   async function publishRepresentativeLocation(preview) {
+    if (window.DartBackgroundPolicy?.allows?.() === false) return false;
     const owner = currentRep(), generation = locationGeneration;
     if (!API_ENABLED || !owner || !preview) return false;
     if (Date.parse(preview.sampledAt) <= Date.parse(latestApiLocation?.sampledAt || "")) return false;
@@ -1989,7 +1990,7 @@
     bindEvents();
     setInterval(updateDeliveryControls, 10000);
     setInterval(() => {
-      if (currentRep() && locationWatch != null && latestPreviewLocation) void publishRepresentativeLocation(latestPreviewLocation);
+      if (window.DartBackgroundPolicy?.allows?.() !== false && currentRep() && locationWatch != null && latestPreviewLocation) void publishRepresentativeLocation(latestPreviewLocation);
     }, LOCATION_SYNC_MS);
     if (API_ENABLED) {
       try {
@@ -2021,6 +2022,7 @@
     }
     const pollAssignedWork = async () => {
       try {
+        if (window.DartBackgroundPolicy?.allows?.() === false) return;
         if (API_ENABLED && !currentRep() && !document.hidden && sessionRecoveryPending) {
           try {
             const payload = await window.DartApi.request("/api/v1/representatives/me");

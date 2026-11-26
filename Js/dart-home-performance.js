@@ -204,7 +204,7 @@
     refreshReviews();
 
     if (!reviewsRefreshTimer) {
-      reviewsRefreshTimer = root.setInterval(refreshReviews, 30000);
+      reviewsRefreshTimer = root.setInterval(() => { if (root.DartBackgroundPolicy?.allows?.() !== false) refreshReviews(); }, 30000);
       root.addEventListener("focus", refreshReviews, { passive: true });
     }
   }

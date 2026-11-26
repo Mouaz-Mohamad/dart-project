@@ -24,6 +24,15 @@
   let heroMediaRequest = 0;
   const heroDefaults = new WeakMap();
   const SETTINGS_POLL_MS = 60_000;
+  // Local clock checks never contact the API. Direct page loads and user actions remain available.
+  let backgroundSchedule = { quietEnabled: true, quietStart: "01:00", quietEnd: "12:00" };
+  root.addEventListener?.("dart:background-schedule", event => { if (event.detail?.schedule) backgroundSchedule = event.detail.schedule; });
+  root.DartBackgroundPolicy = Object.freeze({ allows(now = new Date()) {
+    const s = backgroundSchedule;
+    if (!s.quietEnabled) return true;
+    const local = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+    return !(s.quietStart < s.quietEnd ? local >= s.quietStart && local < s.quietEnd : local >= s.quietStart || local < s.quietEnd);
+  } });
   const defaults = Object.freeze({
     version: 1,
     heroDayImage: null,
@@ -138,6 +147,7 @@
   function setCache(value, persist = true) {
     const normalized = merge(value);
     cachedSettings = normalized;
+
     root.document?.documentElement?.classList?.toggle?.("dart-card-enabled", normalized.dartCardEnabled === true);
     if (persist) {
       root.DartState?.write?.(STORAGE_KEY, normalized, { source: "site-settings" });
@@ -197,10 +207,12 @@
     syncTimer = 0;
     if (!serverVersion) await hydrate(true);
     const normalized = merge(value);
+    delete normalized.backgroundSchedule;
     const payload = await (root.DartAdminApi?.request || api)("/api/v1/admin/site-settings", {
       method: "PUT",
       body: { expectedVersion: serverVersion, settings: normalized },
     });
+    if (payload?.backgroundSchedule) backgroundSchedule = payload.backgroundSchedule;
     serverVersion = Number(payload.version || serverVersion);
     return setCache(payload.settings || normalized);
   }
@@ -236,6 +248,7 @@
     const payload = await api(settingsPath, {
       headers: !force && publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
     });
+    if (payload?.backgroundSchedule) backgroundSchedule = payload.backgroundSchedule;
     if (payload?.notModified) return get();
     serverVersion = Number(payload.version || 1);
     return setCache(payload.settings || {});
@@ -250,6 +263,7 @@
       const payload = await api(settingsPath, {
         headers: !isPrivateRead && publicSettingsEtag ? { "If-None-Match": publicSettingsEtag } : {},
       });
+      if (payload?.backgroundSchedule) backgroundSchedule = payload.backgroundSchedule;
       if (payload?.notModified) return;
       const remoteVersion = Number(payload.version || 0);
       if (remoteVersion && remoteVersion !== serverVersion) {
@@ -401,7 +415,7 @@
   root.document.addEventListener("visibilitychange", () => {
     if (!root.document.hidden) checkForChanges();
   });
-  root.setInterval?.(checkForChanges, SETTINGS_POLL_MS);
+  root.setInterval?.(() => { if (root.DartBackgroundPolicy.allows()) void checkForChanges(); }, SETTINGS_POLL_MS);
 })(typeof window !== "undefined" ? window : globalThis);
 
 

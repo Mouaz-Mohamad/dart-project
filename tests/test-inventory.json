@@ -68,7 +68,9 @@
     "rep-navigation-session.cjs",
     "rep-reliability-runtime.cjs",
     "rep-compass-runtime.cjs",
-    "settings-accordion-contract.cjs"
+    "settings-accordion-contract.cjs",
+    "background-schedule-runtime.cjs",
+    "infrastructure-settings-runtime.cjs"
   ],
   "ciBrowser": [
     "shopping-feedback-browser.cjs",

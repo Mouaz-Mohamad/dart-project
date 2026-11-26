@@ -7,10 +7,10 @@
     }
   },
   "buildCommand": "npm run build:release",
-  "crons": [
-    {
-      "path": "/api/v1/internal/outbox/cron",
-      "schedule": "*/5 * * * *"
+  "crons": [],
+  "git": {
+    "deploymentEnabled": {
+      "work/database-hosting-controls": false
     }
-  ]
+  }
 }

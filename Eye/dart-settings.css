@@ -1088,3 +1088,20 @@ body[data-dart-density="compact"] .dart-compact-record {
  #settings .dart-settings-search-results{grid-template-columns:minmax(0,1fr)}
 }
 /* END Settings six-category navigation. */
+
+/* Database and hosting controls: retain readable brand colors in every state. */
+#settings-content[data-active-settings-tab="database"] > [data-settings-group="database"]:not([hidden]):not(.dart-settings-search-hidden),
+#settings-content[data-active-settings-tab="hosting"] > [data-settings-group="hosting"]:not([hidden]):not(.dart-settings-search-hidden) {display:grid;}
+#settings .dart-infrastructure {color:#171717;background:#fffdf8;}
+#settings .dart-infrastructure h2,#settings .dart-infrastructure legend,#settings .dart-infrastructure dt {color:#68152d;}
+#settings .dart-infrastructure p,#settings .dart-infrastructure label,#settings .dart-infrastructure small,#settings .dart-infrastructure dd,#settings .dart-infrastructure output {color:#171717;line-height:1.8;}
+#settings .dart-infrastructure button {color:#68152d;background:#f6eeee;border:1px solid #68152d;}
+#settings .dart-infrastructure input,#settings .dart-infrastructure select {color:#171717;background:#fff;max-width:100%;box-sizing:border-box;}
+#settings .dart-infrastructure fieldset {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;border:1px solid #dac9cb;border-radius:12px;padding:16px;min-width:0;}
+#settings .dart-infrastructure fieldset p,#settings .dart-infrastructure fieldset small,#settings .dart-infrastructure output {grid-column:1/-1;}
+#settings .dart-infrastructure label {display:grid;gap:6px;}
+#settings .dart-infrastructure .dart-settings-check {display:flex;align-items:center;gap:8px;}
+#settings .dart-infrastructure-metrics {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:0;overflow-wrap:anywhere;}
+#settings .dart-infrastructure-metrics dd {margin:0;}
+#settings .dart-infrastructure-actions {display:flex;flex-wrap:wrap;gap:10px;}
+#settings .dart-infrastructure [data-error="true"] {color:#68152d;}

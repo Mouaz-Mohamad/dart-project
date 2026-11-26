@@ -2543,7 +2543,7 @@
                 <div>
                     <p class="dart-settings-eyebrow">DART CONTROL CENTER</p>
                     <h1 id="settings-page-title">Settings</h1>
-                    <p>Six organized categories for store operations, content and access. Changes are saved separately.</p>
+                    <p>إعدادات المتجر والمحتوى والصلاحيات والاستهلاك. تُحفظ تغييرات كل قسم بشكل مستقل.</p>
                 </div>
                 <i class="fa-solid fa-gear" aria-hidden="true"></i>
             </header>
@@ -2577,6 +2577,12 @@
                         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
                         <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Staff & Permissions</span><small>Dashboard access and roles</small></span>
                     </button>
+                    <button id="settings-tab-database" type="button" class="dart-settings-tab" data-settings-tab="database" hidden aria-selected="false">
+                        <i class="fa-solid fa-database" aria-hidden="true"></i><span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">قاعدة البيانات</span><small>الاستهلاك والفحص والإرسال اليدوي</small></span>
+                    </button>
+                    <button id="settings-tab-hosting" type="button" class="dart-settings-tab" data-settings-tab="hosting" hidden aria-selected="false">
+                        <i class="fa-solid fa-server" aria-hidden="true"></i><span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">الاستضافة</span><small>استهلاك Vercel والديبلوي والتكلفة</small></span>
+                    </button>
                     <button type="button" class="dart-settings-tab" data-settings-tab="maintenance" aria-selected="false">
                         <i class="fa-solid fa-database" aria-hidden="true"></i>
                         <span class="dart-settings-tab-copy"><span class="dart-settings-tab-label">Data & Maintenance</span><small>Protected data actions</small></span>
@@ -2589,6 +2595,44 @@
                         <span id="settings-active-description">Dashboard appearance and alerts</span>
                     </header>
             <div id="settings-content" class="dart-settings-grid" data-active-settings-tab="general">
+                <article id="settings-database-card" data-settings-group="database" class="dart-settings-card dart-settings-form-card dart-settings-wide dart-infrastructure" dir="rtl" hidden>
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-database"></i></div>
+                    <div class="dart-settings-card-copy"><span>NEON</span><h2>قاعدة البيانات</h2><p>التحكم في الفحص الخلفي فقط. فتح الصفحات والطلبات والحفظ اليدوي يستمر بشكل طبيعي.</p></div>
+                    <p id="infrastructure-status" role="status" aria-live="polite"></p>
+                    <button type="button" id="infrastructure-reload" class="dart-settings-secondary">إعادة تحميل الإعدادات</button>
+                    <form id="infrastructure-form" class="dart-settings-fields">
+                        <fieldset id="infrastructure-fields" disabled>
+                            <legend>الفحص التلقائي — بتوقيت مصر</legend>
+                            <label class="dart-settings-check"><input id="infra-enabled" type="checkbox"> تفعيل فحص الرسائل تلقائيًا</label>
+                            <label>الفاصل بالدقائق<input id="infra-interval" type="number" min="5" max="1440" step="5" required></label>
+                            <small>يقبل مضاعفات 5 دقائق بسبب الحد الأدنى لجدولة GitHub. قد يتأخر التشغيل حسب توفر GitHub.</small>
+                            <label class="dart-settings-check"><input id="infra-quiet" type="checkbox"> تفعيل فترة توقف الطلبات التلقائية</label>
+                            <label>بداية التوقف<input id="infra-start" type="time" required></label>
+                            <label>نهاية التوقف<input id="infra-end" type="time" required></label>
+                            <p>فترة التوقف توقف الفحص الخلفي والنسخ المجدولة وتحديثات الصفحات التلقائية. الرسائل المنتظرة تُستأنف بعدها؛ إجراءات العميل المباشرة لا تتأخر.</p>
+                            <label>الخطة المستخدمة للحساب<select id="infra-plan"><option value="free">مجانية</option><option value="paid">مدفوعة حسب الاستهلاك</option></select></label>
+                            <label>حجم التشغيل CU<input id="infra-cu" type="number" min="0.25" max="16" step="0.25" required></label>
+                            <label>سعر CU-hour بالدولار<input id="infra-rate" type="number" min="0" max="10" step="0.001" required></label>
+                            <label>حصة الخطة المجانية CU-hour<input id="infra-allowance" type="number" min="0" max="100000" step="1" required></label>
+                            <p>اختيار CU والسعر هنا للحاسبة فقط؛ لا يغير خطة Neon أو قدرة التشغيل الفعلية.</p>
+                            <output id="infrastructure-estimate" aria-live="polite"></output>
+                            <p>تقدير للفحص المجدول وحده خلال 30 يوم، بافتراض النوم بعد 5 دقائق. لا يشمل الزوار أو الداشبورد أو التخزين أو النسخ الاحتياطي، وليس حدًا أقصى للفاتورة.</p>
+                            <button type="submit" id="infrastructure-save" class="dart-settings-save">حفظ ومزامنة الجدول</button>
+                        </fieldset>
+                    </form>
+                    <div class="dart-infrastructure-actions"><button type="button" id="infrastructure-process" class="dart-settings-secondary" disabled>إرسال المعلّق الآن</button><button type="button" id="infrastructure-database-refresh" class="dart-settings-secondary">تحديث استهلاك Neon</button></div>
+                    <p>الإرسال اليدوي ينفذ دفعة حتى 5 رسائل خلال فترة التوقف أيضًا؛ لا ينشئ رسائل جديدة ولا يتجاوز موافقات العملاء.</p>
+                    <dl id="infrastructure-database-usage" class="dart-infrastructure-metrics" aria-live="polite"><dt>الاستهلاك</dt><dd>اضغط تحديث لقراءة الاستهلاك من Neon.</dd></dl>
+                </article>
+                <article id="settings-hosting-card" data-settings-group="hosting" class="dart-settings-card dart-settings-form-card dart-settings-wide dart-infrastructure" dir="rtl" hidden>
+                    <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-server"></i></div>
+                    <div class="dart-settings-card-copy"><span>VERCEL</span><h2>الاستضافة</h2><p>عدد الديبلوي وطلبات المشاريع ومصروفات الفريق خلال الشهر الميلادي الحالي. القراءة عند الطلب فقط.</p></div>
+                    <button id="infrastructure-hosting-refresh" type="button" class="dart-settings-secondary">تحديث بيانات Vercel</button>
+                    <label>ميزانية مقارنة للفريق بالدولار<input id="infra-hosting-budget" type="number" min="0" max="100000" step="0.01" value="0"></label>
+                    <p>الميزانية مرجع للحاسبة وليست رصيدًا رسميًا أو حد إنفاق لدى Vercel. تُحفظ مع زر حفظ ومزامنة الجدول في قسم قاعدة البيانات.</p>
+                    <dl id="infrastructure-hosting-usage" class="dart-infrastructure-metrics" aria-live="polite"><dt>الاستهلاك</dt><dd>اضغط تحديث لقراءة البيانات من Vercel.</dd></dl>
+                    <p>التكلفة من المصروفات المسجلة للفريق وقد تشمل Neon المرتبط بـVercel؛ لا تجمعها مرة أخرى مع تكلفة Neon. الأرقام ليست فاتورة نهائية، ولا يتم احتساب تكلفة ثابتة لكل ديبلوي.</p>
+                </article>
                 <!-- Owner-only test broadcast; does not create business records. -->
                 <article id="settings-push-test-card" data-settings-group="general" class="dart-settings-card dart-settings-form-card">
                     <div class="dart-settings-card-icon" aria-hidden="true"><i class="fa-solid fa-bell"></i></div>

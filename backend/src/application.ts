@@ -1,3 +1,5 @@
+import { createInfrastructureRouter } from "./modules/settings/infrastructure.routes.js";
+import type { InfrastructureService } from "./modules/settings/infrastructure.service.js";
 import { createAdminNotificationRouter } from "./modules/notifications/admin-notification.routes.js";
 import type { AdminNotificationService } from "./modules/notifications/admin-notification.service.js";
 import { dispatchOutbox } from "./modules/outbox/outbox.dispatch.js";
@@ -100,6 +102,7 @@ export interface AppDependencies extends HealthDependencies {
   financeService?: FinanceService;
   trafficAnalyticsService?: TrafficAnalyticsService;
   outboxService?: OutboxService;
+  infrastructureService?: InfrastructureService;
   whatsappWebhookPool?: Pool;
   birthdayMessagingService?: BirthdayMessagingService;
   maintenanceJob?: () => Promise<void | MaintenanceResult>;
@@ -362,6 +365,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
         ),
       );
     }
+    if (dependencies.infrastructureService) app.use("/api/v1", createInfrastructureRouter(dependencies.infrastructureService, dependencies.identityService, config, dependencies.outboxService));
     if (dependencies.siteSettingsService) {
       app.use(
         "/api/v1",
@@ -426,7 +430,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies): Exp
   }
 
   if (dependencies.outboxService) {
-    app.use("/api/v1", createOutboxRouter(dependencies.outboxService, config, dependencies.maintenanceJob));
+    app.use("/api/v1", createOutboxRouter(dependencies.outboxService, config, dependencies.maintenanceJob, dependencies.infrastructureService ? request => dependencies.infrastructureService!.automaticAllowed(request.get("x-dart-policy-revision")) : undefined));
   }
 
   app.use(notFoundHandler);

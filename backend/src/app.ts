@@ -28,6 +28,8 @@ import {
 import { CatalogService } from "./modules/catalog/catalog.service.js";
 import { CatalogAssetService } from "./modules/catalog/catalog.asset.service.js";
 import { CommerceService } from "./modules/commerce/commerce.service.js";
+import { InfrastructureService } from "./modules/settings/infrastructure.service.js";
+import { InfrastructureProviders } from "./modules/settings/infrastructure-providers.js";
 import { SiteSettingsService } from "./modules/settings/site-settings.service.js";
 import { DashboardStateService } from "./modules/dashboard/dashboard-state.service.js";
 import { CustomerInteractionService } from "./modules/commerce/customer-interaction.service.js";
@@ -151,6 +153,7 @@ export function createRuntimeApplication(
     newsService,
     setCartService,
     siteSettingsService,
+    infrastructureService: new InfrastructureService(database, new InfrastructureProviders(process.env)),
     dashboardStateService,
     customerInteractionService,
     platformAdminService,

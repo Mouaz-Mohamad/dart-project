@@ -251,6 +251,6 @@
     invalidateList();
     if (!doc.hidden && section.classList.contains("active-section") && allowed()) void load(false, true);
   });
-  root.setInterval(() => { if (!root.DartChanges?.active && !doc.hidden && section.classList.contains("active-section")) void load(false, false); }, freshnessMs);
+  root.setInterval(() => { if (root.DartBackgroundPolicy?.allows?.() !== false && !root.DartChanges?.active && !doc.hidden && section.classList.contains("active-section")) void load(false, false); }, freshnessMs);
   applyAccess();
 })(window);

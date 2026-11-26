@@ -684,7 +684,7 @@
     }
     const intervalMs = IS_ADMIN ? 3000 : 20000;
     versionPollTimer = window.setInterval(() => {
-      if (!document.hidden && (!window.DartChanges?.active || catalogDirty)) void checkForServerChanges();
+      if (window.DartBackgroundPolicy?.allows?.() !== false && !document.hidden && (!window.DartChanges?.active || catalogDirty)) void checkForServerChanges();
     }, intervalMs);
   }
 

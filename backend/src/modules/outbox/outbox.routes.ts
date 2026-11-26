@@ -17,6 +17,7 @@ export function createOutboxRouter(
   outbox: OutboxService,
   config: Pick<AppConfig, "outboxCronSecret" | "vercelCronSecret">,
   maintenance?: () => Promise<void | MaintenanceResult>,
+  automaticGate?: (request: Request) => Promise<{ allowed: boolean; reason: string }>,
 ): Router {
   const router = Router();
 
@@ -37,6 +38,13 @@ export function createOutboxRouter(
         },
       });
       return;
+    }
+    if (automaticGate) {
+      const gate = await automaticGate(request);
+      if (!gate.allowed) {
+        response.status(200).json({ skipped: true, reason: gate.reason, claimed: 0, published: 0 });
+        return;
+      }
     }
     const query = z.object({ limit: z.coerce.number().int().min(1).max(10).default(request.method === "GET" ? 10 : 5) }).parse(request.query);
     let maintenanceResult: MaintenanceResult = { ok: true, failedJobs: [] };

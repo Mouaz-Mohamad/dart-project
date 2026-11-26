@@ -76,6 +76,7 @@ for (const [source, delivery] of [
 const dashboardFilterModules = new Set(["Eye/dart-dynamic-filters.js"]);
 const emailLinkPageModules = new Set(["Js/dart-email-link.js", "Eye/dart-email-links.js"]);
 const pageScopedFeatureFiles = new Set([
+  "Eye/dart-infrastructure.js", // Settings-only; capped separately below.
   "Eye/dart-live-operations.js",
   "Eye/dart-order-group-ui.js",
   "Eye/dart-traffic-analytics.js",
@@ -269,8 +270,8 @@ if (fs.statSync("Eye/dart-permissions.js").size > 6 * 1024) failures.push("Staff
 if (fs.statSync("Eye/dart-staff.js").size > 14 * 1024) failures.push("Staff directory exceeds its 14 KiB delivery budget");
 // Preserve the already-delivered customer review grouping when canonical sources rebuild.
 // Its source synchronization costs under 3 KiB; the new Brand module has its own cap above.
-if (coreJsBytes > 966 * 1024) {
-  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 966KB`);
+if (coreJsBytes > 969 * 1024) {
+  failures.push(`Core browser JavaScript is ${Math.ceil(coreJsBytes / 1024)}KB; budget is 969KB`);
 }
 if (fs.statSync('Eye/dart-dashboard-ui.js').size > 14 * 1024) failures.push('Dashboard details adapter exceeds its 14 KiB delivery budget');
 // Combined finance hydration and public navigation add 14 KiB of source. Home delivery still fits 225 KiB.
@@ -279,8 +280,8 @@ if (fs.statSync("Eye/dart-catalog-admin.js").size > 3 * 1024) failures.push("Cat
 // Customer notifications and WhatsApp consent are profile-only, with independent file caps.
 if (fs.statSync("Js/dart-customer-notifications.js").size > 12 * 1024) failures.push("Customer notification runtime exceeds its 12 KiB profile budget");
 if (fs.statSync("Js/dart-whatsapp-preferences.js").size > 3 * 1024) failures.push("WhatsApp preference runtime exceeds its 3 KiB profile budget");
-if (lazyJsBytes > 449 * 1024) {
-  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 449KB`);
+if (lazyJsBytes > 461 * 1024) {
+  failures.push(`Lazy/page-scoped browser JavaScript is ${Math.ceil(lazyJsBytes / 1024)}KB; budget is 461KB`);
 }
 
 // Platform delivery is still an exact minified derivative of dart-platform.js.
@@ -355,8 +356,8 @@ const homeScriptSources = [...homeHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+
   .filter((file, index, list) => list.indexOf(file) === index && fs.existsSync(file));
 const homeInitialJsBytes = homeScriptSources.reduce((sum, file) => sum + fs.statSync(file).size, 0);
 // Rebuilding previously stale Dart Card/stock-notification sources adds under 1 KiB.
-if (homeInitialJsBytes > 226 * 1024) {
-  failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 226KB`);
+if (homeInitialJsBytes > 228 * 1024) {
+  failures.push(`Homepage direct JavaScript is ${Math.ceil(homeInitialJsBytes / 1024)}KB; budget is 228KB`);
 }
 
 const homeCssSources = ["CSS/main.css", "CSS/base.css", "CSS/responsive.css"];

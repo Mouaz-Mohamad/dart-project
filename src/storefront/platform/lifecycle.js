@@ -78,10 +78,10 @@
     updateCartReservationTimer();
   }, 1000);
   setInterval(() => {
-    if (!document.hidden) void hydratePublicLeaderboard();
+    if (!document.hidden && window.DartBackgroundPolicy?.allows?.() !== false) void hydratePublicLeaderboard();
   }, 30000);
   setInterval(async () => {
-    if (!document.hidden && currentUser()) {
+    if (!document.hidden && currentUser() && window.DartBackgroundPolicy?.allows?.() !== false) {
       try {
         await hydrateCustomerCommerce();
         await hydrateWaiting();
@@ -98,7 +98,7 @@
     redirectRememberedCustomer();
   }
   setInterval(() => {
-    if (Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
+    if (window.DartBackgroundPolicy?.allows?.() !== false && Date.now() - apiSessionLastChecked >= 5 * 60 * 1000) void recheckCustomerSession();
   }, 60000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) void recheckCustomerSession(); });
   window.addEventListener("focus", () => {

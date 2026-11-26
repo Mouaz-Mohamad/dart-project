@@ -310,7 +310,7 @@
     if (signal?.reconcile || (signal?.scope === "version" && signal.name === "orders" && signal.version > serverVersion)) void check();
   });
   // Five-minute safety fallback if the event stream is unavailable.
-  window.setInterval(() => !window.DartChanges?.active || reconciliationRequired ? check() : undefined, 300000);
+  window.setInterval(() => window.DartBackgroundPolicy?.allows?.() !== false && (!window.DartChanges?.active || reconciliationRequired) ? check() : undefined, 300000);
   window.DartOrdersApi = {
     hydrate, createManual, updateManual, workflow, bulkWorkflow, correctShipment, shipmentReturned, codVerification, stateAction,
     sync: hydrate, flush: async () => readLocal(), write, read: readLocal, check,

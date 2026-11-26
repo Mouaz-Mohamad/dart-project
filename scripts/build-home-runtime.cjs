@@ -24,6 +24,7 @@ if (require.main === module) for (const [source, output] of [
   ['src/dashboard/order-address.js', 'Eye/dart-order-address.js'],
   ['src/dashboard/shipping-ui.js', 'Eye/dart-shipping-ui.js'],
   ['src/dashboard/settings.js', 'Eye/dart-settings.js'],
+  ['src/dashboard/infrastructure.js', 'Eye/dart-infrastructure.js'],
   ['src/storefront/checkout-regions.js', 'Js/dart-checkout-regions.js'],
   ['src/storefront/address.js', 'Js/dart-address.js'],
   ['src/storefront/catalog.js', 'Js/dart-catalog.js'],

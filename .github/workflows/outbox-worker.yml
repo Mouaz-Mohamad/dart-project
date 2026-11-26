@@ -14,8 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Process committed events and bounded maintenance
+      - name: Checkout scheduler
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/background-schedule.mjs
+          sparse-checkout-cone-mode: false
+      - name: Check schedule without contacting the API
+        id: schedule
         env:
+          DART_BACKGROUND_POLICY: ${{ vars.DART_BACKGROUND_POLICY }}
+          DART_MANUAL_RUN: 'false' # Direct manual sends use the audited dashboard action.
+        run: node scripts/background-schedule.mjs outbox
+      - name: Process committed events and bounded maintenance
+        if: steps.schedule.outputs.run == 'true'
+        env:
+          DART_POLICY_REVISION: ${{ steps.schedule.outputs.revision }}
           DART_OUTBOX_CRON_SECRET: ${{ secrets.DART_OUTBOX_CRON_SECRET }}
         run: |
           set -euo pipefail
@@ -31,12 +45,17 @@ jobs:
             if (( remaining < 1 )); then break; fi
             timeout=$((remaining < 50 ? remaining : 50))
             curl --silent --show-error --fail --max-time "$timeout" --request POST \
+              --header "x-dart-policy-revision: $DART_POLICY_REVISION" \
               --header "Authorization: Bearer $DART_OUTBOX_CRON_SECRET" \
               --output "$response_file" \
               "https://dart-api-dusky.vercel.app/api/v1/internal/outbox/process?limit=5"
             result="$(node - "$response_file" <<'NODE'
           const fs = require('node:fs');
           const result = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (result.skipped) {
+            if (result.reason === 'policy_revision_mismatch') throw new Error('Scheduler policy is out of sync; save the dashboard settings again');
+            process.stdout.write('0 0 0 0'); process.exit(0);
+          }
           for (const field of ['claimed', 'published', 'failed', 'uncertain', 'terminal']) {
             result[field] ??= 0;
             if (!Number.isInteger(result[field]) || result[field] < 0 || result[field] > 5) {
