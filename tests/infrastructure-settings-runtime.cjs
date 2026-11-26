@@ -7,7 +7,7 @@ function fixture(configured = true) {
     return { value: "", checked: false, disabled: false, hidden: false, textContent: "", dataset: {}, children: [], events: new Map(),
       addEventListener(name, callback) { this.events.set(name, callback); }, reportValidity: () => true,
       replaceChildren(...items) { this.children = items.flatMap(item => item.children || [item]); },
-      append(...items) { this.children.push(...items); }, reset() {} };
+      append(...items) { this.children.push(...items); }, click() { return this.events.get("click")?.(); }, reset() {} };
   }
   const node = id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); };
   let allowed = true, confirm = true, failure = null, pending = null;
@@ -28,7 +28,7 @@ function fixture(configured = true) {
     } } };
   vm.runInNewContext(fs.readFileSync("src/dashboard/infrastructure.js", "utf8"), { window, document, Intl, Date, Object, Number, String,
     CustomEvent: class { constructor(type, args) { this.type = type; this.detail = args.detail; } } });
-  const clickTab = () => listeners.get("doc:click")({ target: { closest: () => true } });
+  const clickTab = () => listeners.get("doc:click")({ target: { closest: () => ({ dataset: { settingsTab: "database" } }) } });
   const event = id => node(id).events.get("click")();
   const submit = () => node("infrastructure-form").events.get("submit")({ preventDefault() {} });
   return { node, listeners, requests, clickTab, event, submit, setConfirm: value => { confirm = value; },
@@ -49,9 +49,9 @@ function fixture(configured = true) {
   assert.equal(save.options.body.expectedRevision, 0);
   assert.match(f.node("infrastructure-status").textContent, /تم حفظ/);
   await f.event("infrastructure-hosting-refresh");
-  assert(f.node("infrastructure-hosting-usage").children.some(item => item.textContent === "17"));
+  assert(JSON.stringify(f.node("infrastructure-hosting-usage").children).includes("17"));
   await f.event("infrastructure-database-refresh");
-  assert(f.node("infrastructure-database-usage").children.some(item => /غير متاح/.test(item.textContent)));
+  assert(JSON.stringify(f.node("infrastructure-database-usage").children).includes("غير مربوط"));
   f.setConfirm(false); const before = f.requests.length; await f.event("infrastructure-process");
   assert.equal(f.requests.length, before, "Cancelled manual send never calls API");
   f.setConfirm(true); await f.event("infrastructure-process");

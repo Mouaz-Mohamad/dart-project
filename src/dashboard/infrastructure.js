@@ -8,7 +8,7 @@
   const can = () => window.DartAdminAccess?.can?.("settings.manage") === true;
   const request = (path, options) => window.DartAdminApi.request("/api/v1/admin/infrastructure" + path, options);
   const number = id => Number(byId(id).value);
-  const format = value => Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const format = value => value == null ? "—" : Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
   const status = (message, error = false) => { byId("infrastructure-status").textContent = message; byId("infrastructure-status").dataset.error = String(error); };
   const fields = () => ({
     schedule: { enabled: byId("infra-enabled").checked, intervalMinutes: number("infra-interval"), quietEnabled: byId("infra-quiet").checked,
@@ -20,30 +20,41 @@
     const fragment = document.createDocumentFragment();
     for (const [title, value] of entries) {
       const term = document.createElement("dt"), description = document.createElement("dd");
-      term.textContent = title; description.textContent = value; fragment.append(term, description);
+      term.textContent = title; description.textContent = value; const tile = document.createElement("div"); tile.append(term, description); fragment.append(tile);
     }
     byId(id).replaceChildren(fragment);
   }
+  const date = value => value ? new Date(value).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }) : "—";
+  const plan = value => ({ launch_v3: "Launch · مدفوعة", launch: "Launch · مدفوعة", pro: "Pro", hobby: "Hobby" }[value] || value || "—");
+  const duration = (start, end) => {
+    const seconds = Math.floor((Date.parse(end) - Date.parse(start)) / 1000);
+    return Number.isFinite(seconds) && seconds >= 0 ? `${format(Math.floor(seconds / 3600))} س ${format(Math.floor(seconds % 3600 / 60))} د` : "—";
+  };
   function renderUsage() {
-    if (databaseUsage?.available && current) {
-      const c = fields().calculator, used = databaseUsage.usedCuHours;
-      metrics("infrastructure-database-usage", [["استهلاك التشغيل", `${format(used)} CU-hour`],
-        ["المتبقي حسب الحصة التي أدخلتها", c.plan === "free" ? `${format(Math.max(0, c.freeAllowanceCuHours - used))} CU-hour` : "خطة مدفوعة حسب الاستهلاك"],
-        ["موعد نهاية دورة الاستهلاك", databaseUsage.periodEnd ? new Date(databaseUsage.periodEnd).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }) : "غير متاح"],
-        ["حجم التخزين", databaseUsage.storageBytes == null ? "غير متاح" : `${format(databaseUsage.storageBytes / 1024 ** 2)} MB`],
-        ["وقت القراءة", new Date(databaseUsage.asOf).toLocaleString("ar-EG")]]);
+    if (databaseUsage?.available) {
+      const a = databaseUsage.account || {}, c = databaseUsage.compute;
+      metrics("infrastructure-database-usage", [
+        ["الحساب", a.email || "—"], ["الخطة", plan(a.plan)],
+        ["استهلاك الدورة", `${format(databaseUsage.usedCuHours)} CU-hour`],
+        ["حالة القاعدة", c ? ({ active: "نشطة", idle: "نائمة" }[c.state] || c.state) : "—"],
+        ["مدة التشغيل الحالية", c?.state === "active" ? duration(c.startedAt, databaseUsage.asOf) : "—"],
+        ["حجم التشغيل", c ? `${format(c.minCu)} – ${format(c.maxCu)} CU` : "—"],
+        ["نقل البيانات", databaseUsage.transferBytes == null ? "—" : `${format(databaseUsage.transferBytes / 1024 ** 2)} MB`],
+        ["نهاية الدورة", date(databaseUsage.periodEnd)],
+        ["النوم بعد الخمول", c?.suspendSeconds == null ? "—" : c.suspendSeconds === 0 ? "غير مفعّل" : `${format(c.suspendSeconds / 60)} دقيقة`],
+        ["آخر تحديث", date(databaseUsage.asOf)]
+      ]);
     }
     if (hostingUsage?.available) {
-      const deployments = hostingUsage.deployments || [], complete = deployments.length && deployments.every(item => item.available && item.complete);
-      const count = deployments.reduce((sum, item) => sum + (item.count || 0), 0), billed = hostingUsage.billedUsd;
-      const budget = number("infra-hosting-budget");
-      metrics("infrastructure-hosting-usage", [["ديبلوي المشاريع المحددة هذا الشهر", complete ? format(count) : "غير مكتمل — تعذر قراءة بعض الصفحات أو المشاريع"],
-        ["عدد طلبات المشاريع", hostingUsage.requests == null ? "غير متاح بالصلاحيات الحالية" : format(hostingUsage.requests)],
-        ["مصروفات الفريق المسجلة بالدولار", billed == null ? "غير متاح بالصلاحيات الحالية" : format(billed)],
-        ["المتبقي من ميزانيتك المدخلة", !budget || billed == null ? "غير متاح — أدخل ميزانية واقرأ التكلفة" : `${format(Math.max(0, budget - billed))} USD`],
-        ["المتوقع إذا استمر نفس معدل المصروفات", billed == null ? "غير متاح" : `${format(billed * new Date(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0).getDate() / Math.max(1, (Date.now() - Date.parse(hostingUsage.periodStart)) / 86400000))} USD — تقدير وليس فاتورة`],
-        ["حد الديبلوي / الرصيد الرسمي المتبقي", "غير متاح من واجهة القراءة — راجع فوترة Vercel"],
-        ["وقت القراءة", new Date(hostingUsage.asOf).toLocaleString("ar-EG")]]);
+      const a = hostingUsage.account || {}, deployments = hostingUsage.deployments || [];
+      const complete = deployments.length && deployments.every(item => item.available && item.complete);
+      metrics("infrastructure-hosting-usage", [
+        ["الحساب", a.email || a.name || "—"], ["الفريق والخطة", `${a.team || "—"} · ${plan(a.plan)}`],
+        ["الديبلوي هذا الشهر", complete ? format(deployments.reduce((sum, item) => sum + item.count, 0)) : "غير مكتمل"],
+        ["طلبات الموقع والـAPI", format(hostingUsage.requests)],
+        ["المصروفات المسجلة للفريق", hostingUsage.billedUsd == null ? "—" : `$${format(hostingUsage.billedUsd)}`],
+        ["آخر تحديث", date(hostingUsage.asOf)]
+      ]);
     }
   }
   function estimate() {
@@ -76,7 +87,7 @@
     status("جارٍ تحميل الإعدادات…");
     try {
       const payload = await request(""); if (epoch !== generation || !can()) return;
-      fill(payload); status(payload.schedulerConfigured ? "تم تحميل الإعدادات." : "يلزم ربط صلاحية Variables في GitHub بالخادم لحفظ جدول التشغيل. الحاسبة متاحة للتجربة.");
+      fill(payload); status(payload.schedulerConfigured ? "التوقيت بتوقيت مصر." : "ربط الجدولة مطلوب لتفعيل الحفظ.");
     } catch { if (epoch === generation) status("تعذر تحميل الإعدادات. أعد المحاولة بعد استعادة اتصال قاعدة البيانات.", true); }
     finally { loading = false; }
   }
@@ -115,14 +126,18 @@
       try {
         const data = await request(`/usage/${kind}`); if (epoch !== generation || !can()) return;
         if (kind === "database") databaseUsage = data; else hostingUsage = data;
-        if (!data.available) metrics(output, [["الحالة", "غير متاح — يلزم ربط صلاحيات القراءة بالخادم أو مراجعة اتصال المزود. لا يتم عرض أرقام تقديرية مكان الاستهلاك الفعلي."]]);
+        if (!data.available) metrics(output, [["الحالة", "الحساب غير مربوط بالخادم."]]);
         else { await load(); renderUsage(); }
       } catch { if (epoch === generation) metrics(output, [["الحالة", "تعذر الاتصال. أعد المحاولة."]]); }
       finally { button.disabled = false; }
     });
   }
   document.addEventListener("click", event => {
-    if (event.target.closest?.('[data-settings-tab="database"],[data-settings-tab="hosting"]')) void load();
+    const tab = event.target.closest?.('[data-settings-tab="database"],[data-settings-tab="hosting"]');
+    if (!tab) return;
+    void load();
+    const kind = tab.dataset.settingsTab;
+    if (can() && !(kind === "database" ? databaseUsage : hostingUsage)) byId(`infrastructure-${kind}-refresh`).click();
   });
   window.addEventListener("dart:admin-authenticated", access);
   window.addEventListener("dart:admin-logged-out", () => {

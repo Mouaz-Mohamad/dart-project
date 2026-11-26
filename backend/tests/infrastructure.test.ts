@@ -58,10 +58,14 @@ describe("provider boundaries", () => {
     expect(JSON.parse(body.value)).toEqual({ revision: 2, schedule: DEFAULT_INFRASTRUCTURE.schedule });
     expect(body.value).not.toContain("synthetic");
   });
-  it("converts Neon compute seconds to CU-hours and omits raw owner/credential fields", async () => {
-    const provider = new InfrastructureProviders({ DART_NEON_READ_TOKEN: "synthetic", DART_NEON_PROJECT_ID: "example" }, vi.fn().mockResolvedValue(Response.json({ project: { compute_time_seconds: 3600, owner: { email: "private@example.test" } } })));
-    const value = await provider.neon(); expect(value).toMatchObject({ available: true, usedCuHours: 1 });
-    expect(JSON.stringify(value)).not.toMatch(/private|synthetic/);
+  it("uses Launch billing metrics rather than legacy project counters and selects the production compute", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ project: { id: "example", org_id: "org-test", compute_time_seconds: 0, owner: { email: "owner@example.test", subscription_type: "launch_v3" } } }))
+      .mockResolvedValueOnce(Response.json({ projects: [{ project_id: "example", periods: [{ period_plan: "launch", consumption: [{ metrics: [{ metric_name: "compute_unit_seconds", value: 3600 }] }] }] }] }))
+      .mockResolvedValueOnce(Response.json({ endpoints: [{ id: "ep-prod", current_state: "active", started_at: "2026-11-26T15:46:15Z", autoscaling_limit_min_cu: 0.25, autoscaling_limit_max_cu: 8, suspend_timeout_seconds: 0 }] }));
+    const provider = new InfrastructureProviders({ DART_NEON_READ_TOKEN: "synthetic-secret", DART_NEON_PROJECT_ID: "example", DART_NEON_ENDPOINT_ID: "ep-prod" }, fetcher);
+    const value = await provider.neon(); expect(value).toMatchObject({ available: true, usedCuHours: 1, account: { email: "owner@example.test", plan: "launch_v3" }, compute: { state: "active", minCu: 0.25, maxCu: 8, suspendSeconds: 0 } });
+    expect(fetcher.mock.calls[1]?.[0]).toContain("consumption_history/v2/projects?");
+    expect(JSON.stringify(value)).not.toContain("synthetic-secret");
   });
   it("paginates deployments and counts FOCUS charges once, preserving negative credits", async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ deployments: [{}], pagination: { next: 123 } }))
@@ -73,6 +77,32 @@ describe("provider boundaries", () => {
       deployments: [{ count: 2, complete: true }], billingScope: "team" });
     expect(fetcher.mock.calls[1]?.[0]).toContain("until=123");
   });
+  it("adds separately scoped request totals without dropping the API project", async () => {
+    const scopes: string[][] = [];
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/deployments?")) return Response.json({ deployments: [], pagination: {} });
+      if (url.includes("/observability/")) {
+        const body = JSON.parse(String(init?.body)); scopes.push(body.scope.projectIds);
+        return Response.json({ summary: [{ vercel_request_count_sum: body.scope.projectIds[0] === "site" ? 11 : 7 }], query: { scope: body.scope } });
+      }
+      return new Response("", { status: 403 });
+    });
+    const provider = new InfrastructureProviders({ DART_VERCEL_READ_TOKEN: "synthetic", DART_VERCEL_TEAM_ID: "team-test", DART_VERCEL_PROJECT_IDS: "site,api" }, fetcher as typeof fetch);
+    expect(await provider.hosting()).toMatchObject({ available: true, requests: 18, billedUsd: null });
+    expect(scopes).toEqual([["site"], ["api"]]);
+  });
+  it("keeps account information when deployment reads fail and rejects a mismatched request scope", async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes("/deployments?")) throw new Error("synthetic network error");
+      if (url.includes("/observability/")) return Response.json({ summary: [{ vercel_request_count_sum: 99 }], query: { scope: { projectIds: ["wrong-project"] } } });
+      if (url.endsWith("/v2/user")) return Response.json({ user: { username: "owner" } });
+      if (url.includes("/v2/teams/")) return Response.json({ name: "Dart", billing: { plan: "pro" } });
+      return new Response("", { status: 403 });
+    });
+    const provider = new InfrastructureProviders({ DART_VERCEL_READ_TOKEN: "synthetic", DART_VERCEL_TEAM_ID: "team-test", DART_VERCEL_PROJECT_IDS: "site" }, fetcher as typeof fetch);
+    expect(await provider.hosting()).toMatchObject({ available: true, requests: null, account: { name: "owner", team: "Dart", plan: "pro" }, deployments: [{ available: false, complete: false }] });
+  });
+
 });
 
 describe("database-authoritative infrastructure settings", () => {
