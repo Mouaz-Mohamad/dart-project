@@ -31,6 +31,7 @@ async function handler(_request, response) {
     response.setHeader("Cache-Control", "public, max-age=0, s-maxage=60");
     return response.status(200).send(build(rows));
   } catch {
+    require("../server/public-route-guard.cjs").logPublicFailure("news-sitemap", response);
     response.setHeader("Cache-Control", "no-store");
     return response.status(503).send("News sitemap is temporarily unavailable.");
   }

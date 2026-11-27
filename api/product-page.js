@@ -248,7 +248,7 @@ async function handler(request, response) {
     response.setHeader("Content-Security-Policy", productCsp(html));
     return response.status(200).send(html);
   } catch (error) {
-    console.error("Dart product SSR failed", error instanceof Error ? error.message : error);
+    require("../server/public-route-guard.cjs").logPublicFailure("product", response);
     response.setHeader("Cache-Control", "no-store");
     return response.status(503).send("Product page is temporarily unavailable.");
   }

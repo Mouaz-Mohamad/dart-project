@@ -39,3 +39,7 @@ The Vercel connector refused firewall configuration access; no authenticated Ver
 | Secrets | PASS | No credentials introduced in source, test fixtures or diagnostic messages. |
 
 Final test totals and deployment status are reported in the task response. Real database integration scenarios skipped locally run under the CI test database; synthetic embedded PostgreSQL suites exercise the actual migrations locally.
+
+## Second review
+
+Removed purchaser-name reads from the leaderboard SQL entirely, added sanitized SSR failure records, hashed in-memory limiter keys, and made admission-denial responses explicitly no-store. Added manifest/SRI and denial-cache checks. First full backend review: 1,033 passed / 68 skipped; 70 frontend static checks passed. Second-review regressions: 24 backend checks passed; lint/typecheck passed; frontend build and all 70 checks passed again. The CI pipeline checks the final published tree before production promotion.

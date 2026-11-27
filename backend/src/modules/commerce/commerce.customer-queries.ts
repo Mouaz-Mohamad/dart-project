@@ -19,7 +19,6 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
     try {
       const deliveredResult = await client.query<{
         client_code: string;
-        full_name: string;
         order_code: string;
         final_minor: string;
         amount_refunded_minor: string;
@@ -32,12 +31,6 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
                   o.customer_user_id::text,
                   o.id::text
                 ) AS client_code,
-                COALESCE(
-                  NULLIF(c.full_name,''),
-                  NULLIF(o.contact_snapshot->>'name',''),
-                  NULLIF(o.legacy->>'clientName',''),
-                  'Dart Customer'
-                ) AS full_name,
                 o.order_code,
                 o.final_minor::text,
                 o.amount_refunded_minor::text,
@@ -57,7 +50,7 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
                 (date_trunc('month', now() AT TIME ZONE 'Africa/Cairo') AT TIME ZONE 'Africa/Cairo')
             AND COALESCE(o.delivered_at, o.updated_at) <
                 ((date_trunc('month', now() AT TIME ZONE 'Africa/Cairo') + interval '1 month') AT TIME ZONE 'Africa/Cairo')
-          GROUP BY c.client_code, c.full_name, o.id
+          GROUP BY c.client_code, o.id
           ORDER BY COALESCE(o.delivered_at, o.updated_at), o.order_code`,
       );
 
@@ -113,7 +106,6 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
       const byCustomer = new Map<
         string,
         {
-          name: string;
           orders: number;
           items: number;
           spentMinor: number;
@@ -122,7 +114,6 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
 
       for (const order of deliveredResult.rows) {
         const current = byCustomer.get(order.client_code) || {
-          name: order.full_name,
           orders: 0,
           items: 0,
           spentMinor: 0,

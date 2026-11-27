@@ -1,5 +1,5 @@
 'use strict';
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 // Per-instance admission control supplements the provider's distributed firewall.
 // No cookies, request URLs, addresses, or raw provider errors are retained/logged.
 function createGuard({ limit = 60, windowMs = 60000, concurrency = 8, maxKeys = 10000, now = Date.now } = {}) {
@@ -9,12 +9,13 @@ function createGuard({ limit = 60, windowMs = 60000, concurrency = 8, maxKeys = 
     return async (request, response) => {
       const requestId = randomUUID();
       response.setHeader('X-Request-Id', requestId);
+      response.setHeader('Cache-Control', 'no-store');
       if (request.method && !['GET', 'HEAD'].includes(request.method)) {
         response.setHeader('Allow', 'GET, HEAD');
         return response.status(405).send('Method not allowed');
       }
       const ip = (process.env.VERCEL && request.headers?.['x-vercel-forwarded-for']) || request.socket?.remoteAddress || 'unknown';
-      const key = String(ip).slice(0, 128), time = now();
+      const key = createHash('sha256').update(String(ip).slice(0, 128)).digest('hex'), time = now();
       let bucket = buckets.get(key);
       if (!bucket || bucket.until <= time) {
         for (const [id, entry] of buckets) if (entry.until <= time) buckets.delete(id);
@@ -36,4 +37,8 @@ function createGuard({ limit = 60, windowMs = 60000, concurrency = 8, maxKeys = 
     };
   };
 }
-module.exports = { createGuard };
+function logPublicFailure(route, response) {
+  console.error(JSON.stringify({ event: 'public_page_failed', route,
+    requestId: response.getHeader?.('X-Request-Id') || null, time: new Date().toISOString() }));
+}
+module.exports = { createGuard, logPublicFailure };

@@ -59,7 +59,7 @@ async function handler(request, response) {
       return response.redirect(308, `${PUBLIC_ORIGIN}${links.path(news)}`);
     }
     return send(response, news, 200);
-  } catch { return send(response, null, 503); }
+  } catch { require("../server/public-route-guard.cjs").logPublicFailure("news", response); return send(response, null, 503); }
 }
 module.exports = require("../server/public-route-guard.cjs").createGuard()(handler);
 module.exports._test = { render, escape, safeJson, imageUrl };
