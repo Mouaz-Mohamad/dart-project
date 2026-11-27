@@ -200,7 +200,8 @@ describe("second Council regressions on the production schema", () => {
     const second = await commerce.checkout(f.user, { ...f.input, reservationId: reservation }, "synthetic", undefined, `checkout-${reservation}`);
     await deliver(second);
     const leaderboard = await commerce.publicLeaderboard();
-    expect(leaderboard.rows.find((row) => row.name === "Resale regression")).toMatchObject({ orders: 2, items: 2 });
+    expect(leaderboard.rows).toEqual(expect.arrayContaining([expect.objectContaining({ orders: 2, items: 2 })]));
+    expect(JSON.stringify(leaderboard)).not.toContain("Resale regression");
   });
 
   it("books dated gross COD receipts and refunds once regardless of event order, preserving closed periods", async () => {

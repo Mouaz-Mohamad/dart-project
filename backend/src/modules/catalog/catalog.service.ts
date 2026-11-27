@@ -298,14 +298,10 @@ export class CatalogService {
       model_name: string;
       color: string;
       size: string;
-      owner_name: string | null;
     }>(
-      `SELECT i.item_code, i.model_id, m.name AS model_name, i.color, i.size,
-              c.full_name AS owner_name
+      `SELECT i.item_code, i.model_id, m.name AS model_name, i.color, i.size
          FROM inventory_items i
          JOIN catalog_models m ON m.model_id=i.model_id
-         LEFT JOIN orders o ON o.order_code=i.order_id
-         LEFT JOIN customers c ON c.user_id=o.customer_user_id
         WHERE lower(i.item_code)=lower($1)
           AND lower(i.status)='sold'
           AND i.active
@@ -316,19 +312,13 @@ export class CatalogService {
     );
     const row = result.rows[0];
     if (!row) return null;
-    const ownerName = String(row.owner_name || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .join(" ");
     return {
       itemCode: row.item_code,
       modelId: row.model_id,
       modelName: row.model_name,
       color: row.color,
       size: row.size,
-      ownerName: ownerName || "Dart Customer",
+      ownerName: "Dart Customer",
     };
   }
 

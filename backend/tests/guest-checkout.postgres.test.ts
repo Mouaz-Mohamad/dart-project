@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { embeddedStore } from "./embedded-store.js";
+import { DashboardStateService } from "../src/modules/dashboard/dashboard-state.service.js";
 import { CommerceService } from "../src/modules/commerce/commerce.service.js";
 import { createCommerceRouter } from "../src/modules/commerce/commerce.routes.js";
 import { createSetCartRouter } from "../src/modules/sets/set-cart.routes.js";
@@ -126,31 +127,43 @@ describe("guest cart and atomic account/order creation", () => {
     expect((await commerce.customerCartQuote(null, f.input.reservationId, undefined, "another-browser").catch(error => error)).code).toBe("RESERVATION_EXPIRED");
   });
 
-  it("rejects contradictory phone/email matches without merging customers or losing the cart", async () => {
+  it("keeps partially matching contacts in a new customer without modifying either existing account", async () => {
     const f = await fixture(), other = await fixture(), db = await store.pool.connect();
-    await guestCheckoutCustomer(db, f.input.contact); await guestCheckoutCustomer(db, other.input.contact); db.release();
+    const firstId = await guestCheckoutCustomer(db, f.input.contact);
+    const secondId = await guestCheckoutCustomer(db, other.input.contact); db.release();
     const before = await count("customers");
     await commerce.reserveCart(f.input.reservationId, f.lines, undefined, f.owner);
-    await expect(commerce.checkout(null, { ...f.input, contact: { ...f.input.contact, email: other.input.contact.email } }, "conflict", f.owner, `checkout-${f.input.reservationId}`))
-      .rejects.toMatchObject({ code: "CHECKOUT_CONTACT_CONFLICT" });
-    expect(await count("customers")).toBe(before);
-    expect((await commerce.guestCartForOwner(f.owner)).cart?.lines).toHaveLength(1);
+    const input = { ...f.input, contact: { ...f.input.contact, email: other.input.contact.email } };
+    const order = await commerce.checkout(null, input, "partial", f.owner, `checkout-${f.input.reservationId}`);
+    const linked = (await store.pool.query("SELECT customer_user_id::text id,contact_snapshot FROM orders WHERE id=$1",[order.id])).rows[0]!;
+    expect([firstId,secondId]).not.toContain(linked.id);
+    expect(linked.contact_snapshot.email).toBe(other.input.contact.email);
+    expect(await count("customers")).toBe(before+1);
+    expect((await store.pool.query("SELECT email FROM users WHERE id=$1",[secondId])).rows[0]!.email).toBe(other.input.contact.email);
+    expect((await store.pool.query("SELECT count(*)::int n FROM account_phones WHERE user_id=$1",[linked.id])).rows[0]!.n).toBe(0);
+    expect((await store.pool.query("SELECT count(*)::int n FROM orders WHERE customer_user_id=ANY($1::uuid[])",[[firstId,secondId]])).rows[0]!.n).toBe(0);
+    const repeat = await fixture();
+    await commerce.reserveCart(repeat.input.reservationId, repeat.lines, undefined, repeat.owner);
+    const repeated = await commerce.checkout(null, { ...repeat.input, contact: input.contact },
+      "repeat-partial", repeat.owner, `checkout-${repeat.input.reservationId}`);
+    expect((await store.pool.query("SELECT customer_user_id::text id FROM orders WHERE id=$1",[repeated.id])).rows[0]!.id).toBe(linked.id);
+    expect(await count("customers")).toBe(before+1);
   });
 
-  it("rejects a guest who supplies an existing customer's email with an unrelated phone", async () => {
+  it("accepts an existing email with a new phone as a separate guest customer", async () => {
     const owner = await fixture(), stranger = await fixture(), db = await store.pool.connect();
-    const ownerId = await guestCheckoutCustomer(db, owner.input.contact);
-    db.release();
-    const before = await count("customers");
+    const ownerId = await guestCheckoutCustomer(db, owner.input.contact); db.release();
     await commerce.reserveCart(stranger.input.reservationId, stranger.lines, undefined, stranger.owner);
-    await expect(commerce.checkout(null, {
-      ...stranger.input,
-      contact: { ...stranger.input.contact, email: owner.input.contact.email },
-    }, "unrecognized-email-phone", stranger.owner, `checkout-${stranger.input.reservationId}`))
-      .rejects.toMatchObject({ code: "CHECKOUT_CONTACT_CONFLICT" });
-    expect(await count("customers")).toBe(before);
-    expect((await commerce.guestCartForOwner(stranger.owner)).cart?.lines).toHaveLength(1);
-    expect((await store.pool.query("SELECT count(*)::int AS n FROM orders WHERE customer_user_id=$1", [ownerId])).rows[0]!.n).toBe(0);
+    const order = await commerce.checkout(null, {
+      ...stranger.input, contact: { ...stranger.input.contact, email: owner.input.contact.email },
+    }, "new-contact", stranger.owner, `checkout-${stranger.input.reservationId}`);
+    const actual = (await store.pool.query("SELECT customer_user_id::text id FROM orders WHERE id=$1",[order.id])).rows[0]!.id;
+    expect(actual).not.toBe(ownerId);
+    expect((await store.pool.query("SELECT email FROM users WHERE id=$1",[actual])).rows[0]!.email).toBeNull();
+    const clients = await new DashboardStateService(store.pool).read("customers");
+    expect(clients.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: actual, email: owner.input.contact.email, clientName: stranger.input.contact.name }),
+    ]));
   });
 
   it("accepts a shared phone at guest checkout without linking its owner's orders or login identity", async () => {

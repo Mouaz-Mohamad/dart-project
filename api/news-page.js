@@ -61,5 +61,5 @@ async function handler(request, response) {
     return send(response, news, 200);
   } catch { return send(response, null, 503); }
 }
-module.exports = handler;
+module.exports = require("../server/public-route-guard.cjs").createGuard()(handler);
 module.exports._test = { render, escape, safeJson, imageUrl };

@@ -70,7 +70,8 @@
     "rep-compass-runtime.cjs",
     "settings-accordion-contract.cjs",
     "background-schedule-runtime.cjs",
-    "infrastructure-settings-runtime.cjs"
+    "infrastructure-settings-runtime.cjs",
+    "public-route-guard.cjs"
   ],
   "ciBrowser": [
     "infrastructure-settings-browser.cjs",

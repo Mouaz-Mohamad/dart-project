@@ -152,15 +152,6 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
         byCustomer.set(order.client_code, current);
       }
 
-      const publicName = (value: string) => {
-        const parts = String(value || "")
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean)
-          .slice(0, 3);
-        return parts.length ? parts.join(" ") : "Dart Customer";
-      };
-
       const rows = [...byCustomer.entries()]
         .filter(
           ([clientCode, row]) =>
@@ -174,7 +165,7 @@ export async function readPublicLeaderboard(pool: Pool): Promise<{
         )
         .map(([, row], index) => ({
           rank: index + 1,
-          name: publicName(row.name),
+          name: `Dart Customer ${index + 1}`,
           orders: row.orders,
           items: Math.max(0, row.items),
         }));

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "apexcharts",
+    "version": "8.9.1",
+    "source": "https://cdn.jsdelivr.net/npm/apexcharts@8.9.1/dist/apexcharts.min.js",
+    "integrity": "sha384-NMzs+HvEnYQxcfWzTfKMJdncu8Hl66AUsbR9Lj+7oRso0Li/Aa5I4OpzHMyesaue"
+  },
+  {
+    "name": "chart.js",
+    "version": "4.6.2",
+    "source": "https://cdn.jsdelivr.net/npm/chart.js@4.6.2/dist/chart.umd.min.js",
+    "integrity": "sha384-wFIO1nJgUOP2XDesMi2Xqyej8+jLnzOfBrJbdvz7Pp+UI88xOiL08fKFupi2KqR0"
+  }
+]

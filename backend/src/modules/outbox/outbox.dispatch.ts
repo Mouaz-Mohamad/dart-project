@@ -1,11 +1,18 @@
 import { waitUntil } from "@vercel/functions";
+import { randomUUID } from "node:crypto";
 import type { OutboxService } from "./outbox.service.js";
+
+function reportDispatchFailure(error: unknown): void {
+  // Raw provider errors may include credentials, recipients or message content.
+  console.error(JSON.stringify({ event: "outbox_dispatch_failed", incidentId: randomUUID(),
+    time: new Date().toISOString(), errorType: error instanceof Error ? "Error" : "Unknown" }));
+}
 
 // Durable events are already committed. Vercel keeps this bounded task alive
 // after the HTTP response; standalone Node retains the awaited fallback.
 export async function dispatchOutbox(outbox: OutboxService | undefined, limit: number, deduplicationKey?: string): Promise<void> {
   if (!outbox) return;
-  const task = (deduplicationKey ? outbox.processBatch(1, deduplicationKey) : outbox.processBatch(Math.min(10, Math.max(1, limit)))).catch(() => undefined);
+  const task = (deduplicationKey ? outbox.processBatch(1, deduplicationKey) : outbox.processBatch(Math.min(10, Math.max(1, limit)))).catch(reportDispatchFailure);
   if (process.env.VERCEL) { waitUntil(task); return; }
   await task;
 }
@@ -20,7 +27,7 @@ export async function dispatchAdminTestBroadcast(outbox: OutboxService | undefin
       const result=await outbox.processBatch(10,undefined,testId);
       if(!result.claimed)break;
     }
-  })).catch(()=>undefined);
+  })).catch(reportDispatchFailure);
   if(process.env.VERCEL){waitUntil(task);return;}
   await task;
 }

@@ -254,7 +254,7 @@ async function handler(request, response) {
   }
 }
 
-module.exports = handler;
+module.exports = require("../server/public-route-guard.cjs").createGuard()(handler);
 module.exports._test = {
   SOCIAL_URLS,
   seoSlugPart,

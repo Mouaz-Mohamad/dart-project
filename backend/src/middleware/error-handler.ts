@@ -94,11 +94,13 @@ export function createErrorHandler(
     console.error(JSON.stringify({
       event: "unhandled_request_error_compact",
       requestId,
+      actorId: request.auth?.userId || null,
+      accountType: request.auth?.accountType || null,
       method: request.method,
       path: request.path,
       ...compactError,
     }));
-    request.log.error({ err: error }, "Unhandled request error");
+    request.log.error({ err: error, actorId: request.auth?.userId || null, accountType: request.auth?.accountType || null }, "Unhandled request error");
     Sentry.withScope((scope) => {
       scope.setTag("request_id", requestId);
       scope.setContext("http", {

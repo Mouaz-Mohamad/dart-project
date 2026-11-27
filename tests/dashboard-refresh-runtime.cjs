@@ -7,8 +7,8 @@ const source = fs.readFileSync("Eye/dart.js", "utf8");
 // and loaded before the dashboard runtime that constructs charts.
 const html = fs.readFileSync("Eye/Dart Eye.html", "utf8");
 const headEnd = html.indexOf("</head>");
-const apex = html.indexOf('src="https://cdn.jsdelivr.net/npm/apexcharts"');
-const charts = html.indexOf('src="https://cdn.jsdelivr.net/npm/chart.js"');
+const apex = html.indexOf('src="https://cdn.jsdelivr.net/npm/apexcharts@8.9.1/dist/apexcharts.min.js"');
+const charts = html.indexOf('src="https://cdn.jsdelivr.net/npm/chart.js@4.6.2/dist/chart.umd.min.js"');
 const appJs = html.indexOf('src="dart.js?');
 assert.ok(apex > headEnd && charts > headEnd && appJs > charts, "chart libraries must not block the initial HTML head, but precede dashboard runtime");
 const start = source.indexOf("// BEGIN Scoped dashboard refresh");

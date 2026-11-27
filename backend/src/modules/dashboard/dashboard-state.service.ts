@@ -411,7 +411,10 @@ export class DashboardStateService {
       addresses: Record<string, unknown>[];
     }>(
       `SELECT c.user_id::text, c.client_code, c.full_name, c.birthday::text,
-              c.dart_card_draw_eligible, u.email, u.status, u.deleted_at, c.created_at,
+              c.dart_card_draw_eligible, COALESCE(u.email,
+                (SELECT NULLIF(btrim(o.contact_snapshot->>'email'),'') FROM orders o
+                  WHERE o.customer_user_id=c.user_id ORDER BY o.created_at DESC,o.id DESC LIMIT 1)) AS email,
+              u.status, u.deleted_at, c.created_at,
               COALESCE(
                 jsonb_agg(
                   jsonb_build_object(

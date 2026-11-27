@@ -148,8 +148,11 @@ export function createWhatsAppWebhookRouter(pool: Pick<Pool, "query">, config: C
       for (const reply of replies) await onReply!(reply);
       // Decisions are committed before 200. External sends use the durable outbox.
       response.sendStatus(200);
-      if (replies.length) await afterReplies?.().catch(() => undefined);
+      if (replies.length) await afterReplies?.().catch(() => {
+        request.log?.error({ event: "whatsapp_reply_dispatch_failed", requestId: String(request.id) }, "WhatsApp reply dispatch failed");
+      });
     } catch {
+      request.log?.error({ event: "whatsapp_webhook_persistence_failed", requestId: String(request.id) }, "WhatsApp webhook persistence failed");
       // Meta retries 5xx responses. Never acknowledge a receipt that failed
       // to persist, and never echo payloads, phone numbers or secrets.
       response.sendStatus(503);

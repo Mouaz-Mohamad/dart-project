@@ -162,38 +162,38 @@ describe("CommerceService public leaderboard", () => {
     expect(result.rows).toEqual([
       {
         rank: 1,
-        name: "Migrated Seven Piece",
+        name: "Dart Customer 1",
         orders: 1,
         items: 7,
       },
       {
         rank: 2,
-        name: "Bob Example Customer",
+        name: "Dart Customer 2",
         orders: 1,
         items: 3,
       },
       {
         rank: 3,
-        name: "Alice Example Customer",
+        name: "Dart Customer 3",
         orders: 2,
         items: 2,
       },
       {
         rank: 4,
-        name: "Expired Card Customer",
+        name: "Dart Customer 4",
         orders: 1,
         items: 1,
       },
       {
         rank: 5,
-        name: "Consumed Card Customer",
+        name: "Dart Customer 5",
         orders: 1,
         items: 1,
       },
     ]);
     expect(result.rows.some((row) => row.name.includes("Active Card"))).toBe(false);
-    expect(result.rows.some((row) => row.name.includes("Expired Card"))).toBe(true);
-    expect(result.rows.some((row) => row.name.includes("Consumed Card"))).toBe(true);
+    expect(result.rows[3]).toMatchObject({ orders: 1, items: 1 });
+    expect(result.rows[4]).toMatchObject({ orders: 1, items: 1 });
     expect(release).toHaveBeenCalledOnce();
   });
 });

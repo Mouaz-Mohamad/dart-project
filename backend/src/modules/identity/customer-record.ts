@@ -58,17 +58,14 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
   await client.query("SELECT pg_advisory_xact_lock(hashtext('dart_unified_customer_identity'))");
   const email = normalizeEmail(input.email || "");
   const phone = normalizeEgyptianPhone(input.phone1);
-  const [emailMatch, phoneMatch] = await Promise.all([
-    client.query<{ id: string; status: string }>(
-      `SELECT u.id::text,u.status FROM users u
-        WHERE u.account_type='customer' AND u.deleted_at IS NULL
-          AND u.status<>'deleted' AND u.email_normalized=$1`, [email]),
-    client.query<{ id: string; status: string }>(
-      `SELECT u.id::text,u.status FROM account_phones p
-        JOIN users u ON u.id=p.user_id
-        WHERE p.account_type='customer' AND p.phone_normalized=$1
-          AND u.account_type='customer' AND u.deleted_at IS NULL AND u.status<>'deleted'`, [phone]),
-  ]);
+  const emailMatch = await client.query<{ id: string; status: string }>(
+    `SELECT u.id::text,u.status FROM users u
+      WHERE u.account_type='customer' AND u.deleted_at IS NULL
+        AND u.status<>'deleted' AND u.email_normalized=$1`, [email]);
+  const phoneMatch = await client.query<{ id: string; status: string; is_primary: boolean }>(
+    `SELECT u.id::text,u.status,p.is_primary FROM account_phones p JOIN users u ON u.id=p.user_id
+      WHERE p.account_type='customer' AND p.phone_normalized=$1
+        AND u.account_type='customer' AND u.deleted_at IS NULL AND u.status<>'deleted'`, [phone]);
   const emailOwner = emailMatch.rows[0];
   const phoneOwner = phoneMatch.rows[0];
 
@@ -77,44 +74,24 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
   if ([emailOwner,phoneOwner].some(row => row && !["active","pending_verification"].includes(row.status))) {
     throw new AppError(409,"CHECKOUT_CONTACT_UNAVAILABLE","Please contact Dart support to complete this order.");
   }
-  if (emailOwner && phoneOwner && emailOwner.id !== phoneOwner.id) {
-    // A previous, explicitly separated guest contact may place another order.
-    // An arbitrary phone/email pair does not prove that two logins are one person.
-    const linked = await client.query<{ allowed: boolean }>(
-      `SELECT EXISTS(SELECT 1 FROM customer_contact_phones
-        WHERE customer_user_id=$1::uuid AND phone_normalized=$2
-          AND source='guest_checkout_shared_phone') AS allowed`,
-      [emailOwner.id,phone]);
-    if (!linked.rows[0]?.allowed) {
-      throw new AppError(409,"CHECKOUT_CONTACT_CONFLICT",
-        "Check your phone and email together, or contact Dart support. Your cart is still reserved.");
-    }
-  }
-  if (emailOwner) {
-    // A typed email is NOT authentication. A guest must not attach their order,
-    // COD risk or customer history to an existing account using an unfamiliar
-    // contact number. Previously used order contacts may still place repeat
-    // guest orders; conflicting login phones were checked separately above.
-    const known = phoneOwner?.id === emailOwner.id
-      ? true
-      : (await client.query<{ allowed: boolean }>(
-          `SELECT EXISTS (
-             SELECT 1 FROM customer_contact_phones
-              WHERE customer_user_id=$1::uuid AND phone_normalized=$2
-           ) AS allowed`,
-          [emailOwner.id, phone],
-        )).rows[0]?.allowed === true;
-    if (!known) {
-      throw new AppError(409, "CHECKOUT_CONTACT_CONFLICT",
-        "This email belongs to an existing account. Sign in to order with a new phone, or contact Dart support. Your cart is still reserved.");
-    }
-    return emailOwner.id;
-  }
+  // Linking a purchase never grants account access or changes its profile.
+  if (emailOwner && phoneOwner?.id === emailOwner.id && phoneOwner.is_primary) return emailOwner.id;
+  // Contact-only guest identities have no primary login phone. Match both
+  // submitted contacts, never a historical secondary phone of a login account.
+  const priorGuest = await client.query<{ id: string }>(
+    `SELECT u.id::text FROM users u
+      WHERE u.account_type='customer' AND u.status='active' AND u.deleted_at IS NULL
+        AND (u.email_normalized=$1 OR u.email_normalized IS NULL)
+        AND NOT EXISTS(SELECT 1 FROM account_phones p WHERE p.user_id=u.id AND p.is_primary)
+        AND EXISTS(SELECT 1 FROM orders o WHERE o.customer_user_id=u.id
+          AND lower(btrim(o.contact_snapshot->>'email'))=$1
+          AND dart_customer_phone(o.contact_snapshot->>'phone1')=$2)
+      ORDER BY u.created_at,u.id LIMIT 1`, [email,phone]);
+  if (priorGuest.rows[0]) return priorGuest.rows[0].id;
 
-  if (phoneOwner) {
-    // The email belongs to no existing active customer, but the login phone
-    // does. Preserve its owner, create a separate email-login customer, and
-    // retain the supplied phone only as an unverified order contact.
+  if (emailOwner || phoneOwner) {
+    // A partial match creates a separate customer. Conflicting identifiers
+    // remain order contacts; existing login identities are never overwritten.
     const emailDisplay = (input.email || "").trim();
     if (!email || !emailDisplay || !email.includes("@")) {
       throw new AppError(422,"CHECKOUT_EMAIL_REQUIRED","Enter a valid email address to complete checkout.");
@@ -123,7 +100,7 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
       const created = await client.query<{ id: string }>(
         `INSERT INTO users(account_type,email,email_normalized,password_hash,status)
           VALUES('customer',$1,$2,NULL,'active') RETURNING id::text`,
-        [emailDisplay,email]);
+        [emailOwner ? null : emailDisplay,emailOwner ? null : email]);
       const customerId = created.rows[0]!.id;
       await client.query(
         `INSERT INTO customers(user_id,full_name,birthday)
@@ -152,9 +129,9 @@ export async function guestCheckoutCustomer(client: PoolClient, input: CustomerR
       // or automatic merge. Never expose the existing owner's identity to guests.
       await client.query(
         `INSERT INTO customer_identity_conflicts(record_key,original_record,reason)
-          VALUES($1,jsonb_build_object('guestCustomerId',$2::text,'phoneLoginOwnerId',$3::text),
+          VALUES($1,jsonb_build_object('guestCustomerId',$2::text,'phoneLoginOwnerId',$3::text,'emailLoginOwnerId',$4::text),
             'GUEST_SHARED_LOGIN_PHONE_CONTACT_ONLY')`,
-        [`guest_shared_phone:${customerId}`,customerId,phoneOwner.id]);
+        [`guest_shared_phone:${customerId}`,customerId,phoneOwner?.id || null,emailOwner?.id || null]);
       await client.query(
         `INSERT INTO audit_logs(actor_type,action,entity_type,entity_id,metadata)
           VALUES('system','GUEST_SHARED_LOGIN_PHONE_CONTACT_ONLY','customers',$1,
